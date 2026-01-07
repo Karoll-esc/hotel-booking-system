@@ -1,0 +1,115 @@
+# IDEs
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Docker
+docker-compose.override.yml
+.dockerignore
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*~.nib
+
+# Build artifacts (general)
+dist/
+build/
+out/
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Java/Gradle (Backend)
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+.gradletasknamecache
+bin/
+
+# Node.js/NPM (Frontend)
+node_modules/
+.npm
+.eslintcache
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# Testing
+coverage/
+*.lcov
+.nyc_output
+*.cover
+*.py,cover
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+
+# MacOS
+.AppleDouble
+.LSOverride
+
+# Windows
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.fuse_hidden*
+.nfs*
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+*.7z

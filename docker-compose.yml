@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hotel-booking-postgres
+    environment:
+      POSTGRES_DB: hotel_booking
+      POSTGRES_USER: hotel_admin
+      POSTGRES_PASSWORD: hotel_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - hotel-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hotel_admin -d hotel_booking"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  hotel-booking-api:
+    build:
+      context: ./hotel-booking-api
+      dockerfile: Dockerfile
+    container_name: hotel-booking-api
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/hotel_booking
+      SPRING_DATASOURCE_USERNAME: hotel_admin
+      SPRING_DATASOURCE_PASSWORD: hotel_password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+      SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: "true"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - hotel-network
+    restart: unless-stopped
+
+  hotel-booking-frontend:
+    build:
+      context: ./hotel-booking-fronted
+      dockerfile: Dockerfile
+    container_name: hotel-booking-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - hotel-booking-api
+    networks:
+      - hotel-network
+    restart: unless-stopped
+
+networks:
+  hotel-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

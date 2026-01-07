@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: hotel-booking-api
+  
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/hotel_booking}
+    username: ${SPRING_DATASOURCE_USERNAME:hotel_admin}
+    password: ${SPRING_DATASOURCE_PASSWORD:hotel_password}
+    driver-class-name: org.postgresql.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+    show-sql: ${SPRING_JPA_SHOW_SQL:true}
+    properties:
+      hibernate:
+        format_sql: ${SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL:true}
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  
+server:
+  port: 8080
