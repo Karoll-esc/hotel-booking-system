@@ -2,6 +2,8 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '4.0.1'
 	id 'io.spring.dependency-management' version '1.1.7'
+	id 'jacoco'
+	id 'checkstyle'
 }
 
 group = 'com.sofka'
@@ -35,4 +37,51 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	finalizedBy jacocoTestReport
+}
+
+// Checkstyle temporarily disabled due to DTD loading issues in Gradle
+// Re-enable once project has more classes or use alternative config
+checkstyleMain.enabled = false
+checkstyleTest.enabled = false
+
+jacoco {
+	toolVersion = "0.8.11"
+}
+
+jacocoTestReport {
+	dependsOn test
+	reports {
+		xml.required = true
+		html.required = true
+		csv.required = false
+	}
+}
+
+jacocoTestCoverageVerification {
+	violationRules {
+		rule {
+			limit {
+				minimum = 0.0 // Start with 0%, increase as you add tests
+			}
+		}
+	}
+}
+
+checkstyle {
+	toolVersion = '10.12.5'
+	configFile = file("${rootDir}/config/checkstyle/checkstyle.xml")
+	ignoreFailures = true
+	maxWarnings = 100
+	configProperties = [
+		'checkstyle.enableExternalDtdLoad': 'true'
+	]
+}
+
+checkstyleMain {
+	source = 'src/main/java'
+}
+
+checkstyleTest {
+	source = 'src/test/java'
 }
