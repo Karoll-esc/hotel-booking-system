@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -14,10 +15,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Tests del repositorio de habitaciones.
- * Fase RED de TDD - Historia 2.1: Registrar habitaciones del hotel
- * Escenario: Registro exitoso de nueva habitación
+ * Fase GREEN de TDD - Historia 2.1: Registrar habitaciones del hotel
+ * Usa H2 in-memory database para tests aislados y rápidos
  */
 @DataJpaTest
+@ActiveProfiles("test")
 @DisplayName("RoomRepository - Tests de persistencia con H2")
 class RoomRepositoryTest {
 
