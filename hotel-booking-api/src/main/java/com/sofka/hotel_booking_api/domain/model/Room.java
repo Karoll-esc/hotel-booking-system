@@ -79,7 +79,11 @@ public class Room {
         return isAvailable;
     }
 
-    // Setters (para permitir actualizaciones)
+    // Setters (para permitir actualizaciones y tests)
+    public void setId(Long id) {
+        this.id = id;
+    }
+
     public void setRoomNumber(String roomNumber) {
         this.roomNumber = roomNumber;
     }

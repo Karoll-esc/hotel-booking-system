@@ -1,5 +1,6 @@
 package com.sofka.hotel_booking_api.application.service;
 
+import com.sofka.hotel_booking_api.domain.exception.DuplicateRoomNumberException;
 import com.sofka.hotel_booking_api.domain.model.Room;
 import com.sofka.hotel_booking_api.domain.model.RoomType;
 import com.sofka.hotel_booking_api.domain.repository.RoomRepository;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -22,7 +24,7 @@ import static org.mockito.Mockito.*;
 
 /**
  * Tests unitarios del servicio de habitaciones.
- * Fase RED de TDD - Historia 2.1: Registrar habitaciones del hotel
+ * Fase GREEN de TDD - Historia 2.1: Registrar habitaciones del hotel
  * Escenario: Registro exitoso de nueva habitación
  */
 @ExtendWith(MockitoExtension.class)
@@ -36,7 +38,6 @@ class RoomServiceTest {
     private RoomService roomService;
 
     private CreateRoomRequest validRequest;
-    private Room roomToSave;
     private Room savedRoom;
 
     @BeforeEach
@@ -49,62 +50,90 @@ class RoomServiceTest {
                 new BigDecimal("250.00")
         );
 
-        roomToSave = new Room("301", RoomType.SUITE, 4, new BigDecimal("250.00"));
-        
         savedRoom = new Room("301", RoomType.SUITE, 4, new BigDecimal("250.00"));
-        // Simular que tiene ID después de guardarse
-        // (en producción, JPA lo asignaría automáticamente)
+        savedRoom.setId(1L); // Simular que JPA asignó un ID
     }
 
     @Test
     @DisplayName("Debe registrar habitación exitosamente cuando los datos son válidos")
     void shouldRegisterRoomSuccessfully() {
-        // Given - Dado que el repositorio guardará la habitación
+        // Given - Dado que el número de habitación no existe
+        when(roomRepository.existsByRoomNumber("301")).thenReturn(false);
         when(roomRepository.save(any(Room.class))).thenReturn(savedRoom);
 
         // When - Cuando registro una habitación con datos válidos
-        // Then - Este test DEBE FALLAR con UnsupportedOperationException (fase RED)
-        assertThatThrownBy(() -> roomService.registerRoom(validRequest))
-                .isInstanceOf(UnsupportedOperationException.class)
-                .hasMessageContaining("Método no implementado aún");
+        RoomResponse response = roomService.registerRoom(validRequest);
+
+        // Then - La habitación debe quedar registrada correctamente
+        assertThat(response).isNotNull();
+        assertThat(response.getId()).isEqualTo(1L);
+        assertThat(response.getRoomNumber()).isEqualTo("301");
+        assertThat(response.getRoomType()).isEqualTo(RoomType.SUITE);
+        assertThat(response.getCapacity()).isEqualTo(4);
+        assertThat(response.getPricePerNight()).isEqualByComparingTo(new BigDecimal("250.00"));
+        assertThat(response.getIsAvailable()).isTrue();
+
+        // Verificar que se validó la duplicidad
+        verify(roomRepository, times(1)).existsByRoomNumber("301");
+        // Verificar que se guardó la habitación
+        verify(roomRepository, times(1)).save(any(Room.class));
     }
 
     @Test
     @DisplayName("Debe llamar al repositorio para guardar la habitación")
     void shouldCallRepositoryToSaveRoom() {
-        // Given - Dado que el repositorio está configurado
+        // Given
+        when(roomRepository.existsByRoomNumber("301")).thenReturn(false);
         when(roomRepository.save(any(Room.class))).thenReturn(savedRoom);
 
-        // When - Cuando intento registrar una habitación
-        // Then - Este test DEBE FALLAR porque el método lanza UnsupportedOperationException
-        try {
-            roomService.registerRoom(validRequest);
-        } catch (UnsupportedOperationException e) {
-            // Esperado en fase RED
-            assertThat(e.getMessage()).contains("Método no implementado aún");
-        }
+        // When
+        roomService.registerRoom(validRequest);
 
-        // En fase GREEN, este test verificará que se llamó al repositorio
-        // verify(roomRepository, times(1)).save(any(Room.class));
+        // Then - Debe llamar exactamente una vez al método save
+        ArgumentCaptor<Room> roomCaptor = ArgumentCaptor.forClass(Room.class);
+        verify(roomRepository, times(1)).save(roomCaptor.capture());
+
+        // Verificar que los datos del Room son correctos
+        Room capturedRoom = roomCaptor.getValue();
+        assertThat(capturedRoom.getRoomNumber()).isEqualTo("301");
+        assertThat(capturedRoom.getRoomType()).isEqualTo(RoomType.SUITE);
+        assertThat(capturedRoom.getCapacity()).isEqualTo(4);
+        assertThat(capturedRoom.getPricePerNight()).isEqualByComparingTo(new BigDecimal("250.00"));
+        assertThat(capturedRoom.getIsAvailable()).isTrue();
     }
 
     @Test
     @DisplayName("Debe retornar RoomResponse con los datos de la habitación registrada")
     void shouldReturnRoomResponseWithRegisteredData() {
-        // Given - Dado que el repositorio retorna la habitación guardada
+        // Given
+        when(roomRepository.existsByRoomNumber("301")).thenReturn(false);
         when(roomRepository.save(any(Room.class))).thenReturn(savedRoom);
 
-        // When/Then - Este test DEBE FALLAR por UnsupportedOperationException
-        assertThatThrownBy(() -> {
-            RoomResponse response = roomService.registerRoom(validRequest);
-            
-            // En fase GREEN, estas aserciones deberían pasar:
-            assertThat(response).isNotNull();
-            assertThat(response.getRoomNumber()).isEqualTo("301");
-            assertThat(response.getRoomType()).isEqualTo(RoomType.SUITE);
-            assertThat(response.getCapacity()).isEqualTo(4);
-            assertThat(response.getPricePerNight()).isEqualByComparingTo(new BigDecimal("250.00"));
-            assertThat(response.getIsAvailable()).isTrue();
-        }).isInstanceOf(UnsupportedOperationException.class);
+        // When
+        RoomResponse response = roomService.registerRoom(validRequest);
+
+        // Then - Verificar mapeo correcto de entidad a DTO
+        assertThat(response).isNotNull();
+        assertThat(response.getId()).isNotNull();
+        assertThat(response.getRoomNumber()).isEqualTo(validRequest.getRoomNumber());
+        assertThat(response.getRoomType()).isEqualTo(validRequest.getRoomType());
+        assertThat(response.getCapacity()).isEqualTo(validRequest.getCapacity());
+        assertThat(response.getPricePerNight()).isEqualByComparingTo(validRequest.getPricePerNight());
+        assertThat(response.getIsAvailable()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Debe lanzar excepción cuando el número de habitación ya existe")
+    void shouldThrowExceptionWhenRoomNumberAlreadyExists() {
+        // Given - Dado que ya existe una habitación con número "301"
+        when(roomRepository.existsByRoomNumber("301")).thenReturn(true);
+
+        // When/Then - Debe lanzar DuplicateRoomNumberException
+        assertThatThrownBy(() -> roomService.registerRoom(validRequest))
+                .isInstanceOf(DuplicateRoomNumberException.class)
+                .hasMessageContaining("Ya existe una habitación registrada con el número '301'");
+
+        // Verificar que NO se intentó guardar
+        verify(roomRepository, never()).save(any(Room.class));
     }
 }

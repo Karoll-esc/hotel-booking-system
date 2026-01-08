@@ -21,16 +21,6 @@ public class RoomResponse {
     public RoomResponse() {
     }
 
-    // Constructor desde entidad Room
-    public RoomResponse(Room room) {
-        this.id = room.getId();
-        this.roomNumber = room.getRoomNumber();
-        this.roomType = room.getRoomType();
-        this.capacity = room.getCapacity();
-        this.pricePerNight = room.getPricePerNight();
-        this.isAvailable = room.getIsAvailable();
-    }
-
     // Constructor con todos los campos
     public RoomResponse(Long id, String roomNumber, RoomType roomType, Integer capacity, 
                         BigDecimal pricePerNight, Boolean isAvailable) {
@@ -40,6 +30,20 @@ public class RoomResponse {
         this.capacity = capacity;
         this.pricePerNight = pricePerNight;
         this.isAvailable = isAvailable;
+    }
+
+    /**
+     * Método factory para crear un RoomResponse desde una entidad Room
+     */
+    public static RoomResponse fromEntity(Room room) {
+        return new RoomResponse(
+            room.getId(),
+            room.getRoomNumber(),
+            room.getRoomType(),
+            room.getCapacity(),
+            room.getPricePerNight(),
+            room.getIsAvailable()
+        );
     }
 
     // Getters y Setters

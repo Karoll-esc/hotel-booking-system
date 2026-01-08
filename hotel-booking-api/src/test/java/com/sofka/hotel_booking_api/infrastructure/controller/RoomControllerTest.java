@@ -2,6 +2,7 @@ package com.sofka.hotel_booking_api.infrastructure.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sofka.hotel_booking_api.application.service.RoomService;
+import com.sofka.hotel_booking_api.domain.exception.DuplicateRoomNumberException;
 import com.sofka.hotel_booking_api.domain.model.RoomType;
 import com.sofka.hotel_booking_api.infrastructure.dto.CreateRoomRequest;
 import com.sofka.hotel_booking_api.infrastructure.dto.RoomResponse;
@@ -10,7 +11,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -23,10 +25,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Tests del controlador de habitaciones.
- * Fase RED de TDD - Historia 2.1: Registrar habitaciones del hotel
+ * Fase GREEN de TDD - Historia 2.1: Registrar habitaciones del hotel
  * Escenario: Registro exitoso de nueva habitación
  */
-@WebMvcTest(RoomController.class)
+@WebMvcTest(controllers = RoomController.class, 
+            excludeAutoConfiguration = {
+                org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class,
+                org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration.class
+            })
+@Import(com.sofka.hotel_booking_api.infrastructure.exception.GlobalExceptionHandler.class)
 @DisplayName("RoomController - Tests de integración")
 class RoomControllerTest {
 
@@ -36,7 +43,7 @@ class RoomControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @MockitoBean
     private RoomService roomService;
 
     private CreateRoomRequest validRequest;
@@ -65,24 +72,21 @@ class RoomControllerTest {
     @Test
     @DisplayName("POST /api/rooms debe registrar habitación y retornar 201 Created")
     void shouldRegisterRoomAndReturn201() throws Exception {
-        // Given - Dado que el servicio registrará la habitación
+        // Given - Dado que el servicio registrará la habitación exitosamente
         when(roomService.registerRoom(any(CreateRoomRequest.class)))
-                .thenThrow(new UnsupportedOperationException("Método no implementado aún - fase RED de TDD"));
+                .thenReturn(expectedResponse);
 
-        // When - Cuando envío POST con datos válidos
-        // Then - Este test DEBE FALLAR con 500 Internal Server Error por UnsupportedOperationException
+        // When/Then - Cuando envío POST con datos válidos
         mockMvc.perform(post("/api/rooms")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
-                .andExpect(status().isInternalServerError()); // Esperamos 500 en fase RED
-
-        // En fase GREEN, cambiaremos a:
-        // .andExpect(status().isCreated())
-        // .andExpect(jsonPath("$.roomNumber").value("301"))
-        // .andExpect(jsonPath("$.roomType").value("SUITE"))
-        // .andExpect(jsonPath("$.capacity").value(4))
-        // .andExpect(jsonPath("$.pricePerNight").value(250.00))
-        // .andExpect(jsonPath("$.isAvailable").value(true));
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.roomNumber").value("301"))
+                .andExpect(jsonPath("$.roomType").value("SUITE"))
+                .andExpect(jsonPath("$.capacity").value(4))
+                .andExpect(jsonPath("$.pricePerNight").value(250.00))
+                .andExpect(jsonPath("$.isAvailable").value(true));
     }
 
     @Test
@@ -150,5 +154,22 @@ class RoomControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("POST /api/rooms debe retornar 409 Conflict cuando el número de habitación ya existe")
+    void shouldReturn409WhenRoomNumberAlreadyExists() throws Exception {
+        // Given - Dado que el servicio lanza excepción de número duplicado
+        when(roomService.registerRoom(any(CreateRoomRequest.class)))
+                .thenThrow(new DuplicateRoomNumberException("301"));
+
+        // When/Then - Cuando envío POST debe retornar 409 Conflict
+        mockMvc.perform(post("/api/rooms")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRequest)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.error").value("Número de habitación duplicado"))
+                .andExpect(jsonPath("$.message").value("Ya existe una habitación registrada con el número '301'"));
     }
 }
