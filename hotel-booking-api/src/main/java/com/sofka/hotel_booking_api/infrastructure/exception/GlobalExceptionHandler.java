@@ -1,6 +1,7 @@
 package com.sofka.hotel_booking_api.infrastructure.exception;
 
 import com.sofka.hotel_booking_api.domain.exception.DuplicateRoomNumberException;
+import com.sofka.hotel_booking_api.infrastructure.constants.ValidationMessages;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -13,45 +14,108 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Manejador global de excepciones para la API
- * Convierte excepciones en respuestas HTTP apropiadas
+ * Manejador global de excepciones para la API REST.
+ * 
+ * <p>Intercepta excepciones lanzadas por los controladores y las convierte en 
+ * respuestas HTTP apropiadas con formato consistente.</p>
+ * 
+ * <p>Tipos de excepciones manejadas:</p>
+ * <ul>
+ *   <li>{@link DuplicateRoomNumberException} → 409 CONFLICT</li>
+ *   <li>{@link MethodArgumentNotValidException} → 400 BAD REQUEST</li>
+ * </ul>
+ * 
+ * @author Sistema Hotel Booking
+ * @version 1.0
+ * @since 2026-01-07
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     /**
-     * Maneja excepciones de número de habitación duplicado
+     * Maneja excepciones cuando se intenta registrar una habitación con número duplicado.
+     * 
+     * @param ex la excepción de número duplicado
+     * @return respuesta HTTP 409 CONFLICT con detalles del error
      */
     @ExceptionHandler(DuplicateRoomNumberException.class)
     public ResponseEntity<ErrorResponse> handleDuplicateRoomNumber(DuplicateRoomNumberException ex) {
-        ErrorResponse error = new ErrorResponse(
-            HttpStatus.CONFLICT.value(),
-            "Número de habitación duplicado",
-            ex.getMessage(),
-            LocalDateTime.now()
+        ErrorResponse error = buildErrorResponse(
+            HttpStatus.CONFLICT,
+            ValidationMessages.DUPLICATE_ROOM_NUMBER_TITLE,
+            ex.getMessage()
         );
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
 
     /**
-     * Maneja errores de validación de Bean Validation
+     * Maneja errores de validación de Bean Validation (@Valid).
+     * Extrae todos los errores de validación y los agrupa por campo.
+     * 
+     * @param ex la excepción de validación
+     * @return respuesta HTTP 400 BAD REQUEST con detalles de validación por campo
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ValidationErrorResponse> handleValidationErrors(MethodArgumentNotValidException ex) {
+        Map<String, String> errors = extractValidationErrors(ex);
+        
+        ValidationErrorResponse errorResponse = buildValidationErrorResponse(
+            HttpStatus.BAD_REQUEST,
+            ValidationMessages.VALIDATION_ERROR_TITLE,
+            errors
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+    }
+    
+    /**
+     * Extrae los errores de validación de la excepción.
+     * 
+     * @param ex la excepción de validación
+     * @return mapa con nombre de campo y mensaje de error
+     */
+    private Map<String, String> extractValidationErrors(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getAllErrors().forEach(error -> {
             String fieldName = ((FieldError) error).getField();
             String errorMessage = error.getDefaultMessage();
             errors.put(fieldName, errorMessage);
         });
-
-        ValidationErrorResponse errorResponse = new ValidationErrorResponse(
-            HttpStatus.BAD_REQUEST.value(),
-            "Errores de validación",
-            errors,
+        return errors;
+    }
+    
+    /**
+     * Construye una respuesta de error simple.
+     * 
+     * @param status el estado HTTP
+     * @param error el título del error
+     * @param message el mensaje descriptivo
+     * @return objeto ErrorResponse
+     */
+    private ErrorResponse buildErrorResponse(HttpStatus status, String error, String message) {
+        return new ErrorResponse(
+            status.value(),
+            error,
+            message,
             LocalDateTime.now()
         );
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+    }
+    
+    /**
+     * Construye una respuesta de error de validación.
+     * 
+     * @param status el estado HTTP
+     * @param error el título del error
+     * @param validationErrors mapa de errores por campo
+     * @return objeto ValidationErrorResponse
+     */
+    private ValidationErrorResponse buildValidationErrorResponse(
+            HttpStatus status, String error, Map<String, String> validationErrors) {
+        return new ValidationErrorResponse(
+            status.value(),
+            error,
+            validationErrors,
+            LocalDateTime.now()
+        );
     }
 
     /**
