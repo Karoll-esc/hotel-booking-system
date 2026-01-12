@@ -8,6 +8,9 @@ import com.sofka.hotel_booking_api.infrastructure.dto.RoomResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 /**
  * Servicio para gestionar las habitaciones del hotel.
  */
@@ -22,7 +25,6 @@ public class RoomService {
 
     /**
      * Registra una nueva habitación en el sistema.
-     * Según Historia 2.1: Registrar habitaciones del hotel - Escenario: Registro exitoso
      *
      * @param request datos de la habitación a registrar
      * @return la habitación registrada
@@ -53,5 +55,18 @@ public class RoomService {
 
         // 4. Convertir la entidad a DTO de respuesta
         return RoomResponse.fromEntity(savedRoom);
+    }
+
+    /**
+     * Obtiene todas las habitaciones registradas en el sistema.
+     *
+     * @return lista de todas las habitaciones
+     */
+    @Transactional(readOnly = true)
+    public List<RoomResponse> getAllRooms() {
+        return roomRepository.findAll()
+            .stream()
+            .map(RoomResponse::fromEntity)
+            .collect(Collectors.toList());
     }
 }
