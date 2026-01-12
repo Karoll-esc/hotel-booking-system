@@ -424,6 +424,10 @@ class RoomControllerTest {
         // Given - Dado que fecha de inicio es posterior a fecha de fin
         LocalDate checkIn = LocalDate.of(2026, 2, 20);
         LocalDate checkOut = LocalDate.of(2026, 2, 15);
+        
+        when(roomService.getAvailableRooms(eq(checkIn), eq(checkOut), eq(null)))
+                .thenThrow(new com.sofka.hotel_booking_api.domain.exception.InvalidDateRangeException(
+                        "La fecha de entrada debe ser anterior a la fecha de salida"));
 
         // When/Then - Cuando envío fechas inválidas debe retornar 400
         mockMvc.perform(get("/api/rooms/available")
@@ -473,6 +477,10 @@ class RoomControllerTest {
         // Given - Dado que la fecha de entrada es en el pasado
         LocalDate pastDate = LocalDate.of(2025, 12, 1);
         LocalDate checkOut = LocalDate.of(2026, 2, 20);
+        
+        when(roomService.getAvailableRooms(eq(pastDate), eq(checkOut), eq(null)))
+                .thenThrow(new com.sofka.hotel_booking_api.domain.exception.InvalidDateRangeException(
+                        "La fecha de entrada no puede ser en el pasado"));
 
         // When/Then - Cuando envío fecha pasada debe retornar 400
         mockMvc.perform(get("/api/rooms/available")
