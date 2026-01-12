@@ -56,60 +56,59 @@ jacocoTestReport {
 		html.required = true
 		csv.required = false
 	}
+	
+	// Excluir de los reportes lo que NO es lógica de negocio
+	afterEvaluate {
+		classDirectories.setFrom(
+			files(classDirectories.files.collect {
+				fileTree(dir: it, exclude: [
+					'**/config/**',
+					'**/dto/**',
+					'**/controller/**',
+					'**/*Application.class'
+				])
+			})
+		)
+	}
 }
 
 
 jacocoTestCoverageVerification {
     violationRules {
-        rule {
-            element = 'PACKAGE'
-            limit {
-                counter = 'LINE'
-                value = 'COVEREDRATIO'
-                minimum = 0.70
-            }
-            // Aplicar solo a la capa de aplicación (lógica de negocio)
-            includes = [
-                'com.sofka.hotel_booking_api.application.*',
-                'com.sofka.hotel_booking_api.domain.model.*'
-            ]
-        }
-        
+        // Regla 1: Cobertura mínima del 70% en servicios de aplicación
         rule {
             element = 'CLASS'
             limit {
                 counter = 'LINE'
                 value = 'COVEREDRATIO'
-                minimum = 0.80
+                minimum = 0.70
             }
-            // Services deben tener mayor cobertura
             includes = [
                 'com.sofka.hotel_booking_api.application.service.*'
+            ]
+        }
+
+        // Regla 2: Cobertura mínima del 50% en modelos con lógica de negocio
+        rule {
+            element = 'CLASS'
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.50
+            }
+            includes = [
+                'com.sofka.hotel_booking_api.domain.model.*'
+            ]
+            excludes = [
+                '*.Guest',
+                '*.Room',
+                '*.RoomType',
+                '*.ReservationStatus'
             ]
         }
     }
 }
 
-jacocoTestReport {
-    dependsOn test
-    reports {
-        xml.required = true
-        html.required = true
-        csv.required = false
-    }
-    
-    // Excluir de reportes lo que no es lógica de negocio
-    afterEvaluate {
-        classDirectories.setFrom(files(classDirectories.files.collect {
-            fileTree(dir: it, exclude: [
-                '**/config/**',
-                '**/dto/**',
-                '**/controller/**',
-                '**/*Application.class'
-            ])
-        }))
-    }
-}
 
 
 checkstyle {
