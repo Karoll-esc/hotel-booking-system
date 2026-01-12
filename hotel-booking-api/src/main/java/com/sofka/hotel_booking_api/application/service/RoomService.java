@@ -144,7 +144,34 @@ public class RoomService {
      */
     @Transactional(readOnly = true)
     public List<RoomResponse> getAvailableRooms(LocalDate checkIn, LocalDate checkOut, RoomType roomType) {
-        // TODO: Implementar en fase GREEN
-        throw new UnsupportedOperationException("Not implemented yet");
+        // 1. Validar que checkIn no sea en el pasado
+        if (checkIn.isBefore(LocalDate.now())) {
+            throw new InvalidDateRangeException("La fecha de entrada no puede ser en el pasado");
+        }
+
+        // 2. Validar que checkIn sea antes de checkOut
+        if (checkIn.isAfter(checkOut) || checkIn.isEqual(checkOut)) {
+            throw new InvalidDateRangeException("La fecha de entrada debe ser anterior a la fecha de salida");
+        }
+
+        // 3. Obtener todas las habitaciones disponibles
+        List<Room> availableRooms;
+        if (roomType != null) {
+            // Filtrar por tipo de habitación
+            availableRooms = roomRepository.findAll().stream()
+                    .filter(room -> room.getIsAvailable() && room.getRoomType() == roomType)
+                    .collect(Collectors.toList());
+        } else {
+            // Sin filtro de tipo
+            availableRooms = roomRepository.findAll().stream()
+                    .filter(Room::getIsAvailable)
+                    .collect(Collectors.toList());
+        }
+
+        // 4. Convertir a DTO y retornar
+        // TODO: En futuro, validar que no tengan reservas en el rango de fechas
+        return availableRooms.stream()
+                .map(RoomResponse::fromEntity)
+                .collect(Collectors.toList());
     }
 }
