@@ -1,6 +1,7 @@
 package com.sofka.hotel_booking_api.infrastructure.exception;
 
 import com.sofka.hotel_booking_api.domain.exception.DuplicateRoomNumberException;
+import com.sofka.hotel_booking_api.domain.exception.RoomNotFoundException;
 import com.sofka.hotel_booking_api.infrastructure.constants.ValidationMessages;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,7 @@ import java.util.Map;
  * <p>Tipos de excepciones manejadas:</p>
  * <ul>
  *   <li>{@link DuplicateRoomNumberException} → 409 CONFLICT</li>
+ *   <li>{@link RoomNotFoundException} → 404 NOT FOUND</li>
  *   <li>{@link MethodArgumentNotValidException} → 400 BAD REQUEST</li>
  * </ul>
  * 
@@ -46,6 +48,22 @@ public class GlobalExceptionHandler {
             ex.getMessage()
         );
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    /**
+     * Maneja excepciones cuando no se encuentra una habitación por ID.
+     * 
+     * @param ex la excepción de habitación no encontrada
+     * @return respuesta HTTP 404 NOT FOUND con detalles del error
+     */
+    @ExceptionHandler(RoomNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleRoomNotFound(RoomNotFoundException ex) {
+        ErrorResponse error = buildErrorResponse(
+            HttpStatus.NOT_FOUND,
+            "Habitación no encontrada",
+            ex.getMessage()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
 
     /**
