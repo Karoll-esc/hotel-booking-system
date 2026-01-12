@@ -1,13 +1,16 @@
 package com.sofka.hotel_booking_api.infrastructure.controller;
 
 import com.sofka.hotel_booking_api.application.service.RoomService;
+import com.sofka.hotel_booking_api.domain.model.RoomType;
 import com.sofka.hotel_booking_api.infrastructure.dto.CreateRoomRequest;
 import com.sofka.hotel_booking_api.infrastructure.dto.RoomResponse;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -88,5 +91,24 @@ public class RoomController {
     public ResponseEntity<Void> deleteRoom(@PathVariable Long id) {
         roomService.deleteRoom(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Endpoint para consultar habitaciones disponibles en un rango de fechas.
+     * GET /api/rooms/available
+     * Historia 2.2: Consultar estado de ocupación de habitaciones
+     *
+     * @param checkIn fecha de entrada (obligatoria)
+     * @param checkOut fecha de salida (obligatoria)
+     * @param roomType tipo de habitación (opcional)
+     * @return lista de habitaciones disponibles
+     */
+    @GetMapping("/available")
+    public ResponseEntity<List<RoomResponse>> getAvailableRooms(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkIn,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkOut,
+            @RequestParam(required = false) RoomType roomType) {
+        List<RoomResponse> availableRooms = roomService.getAvailableRooms(checkIn, checkOut, roomType);
+        return ResponseEntity.ok(availableRooms);
     }
 }
