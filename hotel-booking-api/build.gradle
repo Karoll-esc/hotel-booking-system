@@ -38,6 +38,8 @@ tasks.named('test') {
 	finalizedBy jacocoTestReport
 }
 
+check.dependsOn jacocoTestCoverageVerification
+
 // Checkstyle temporarily disabled due to DTD loading issues in Gradle
 // Re-enable once project has more classes or use alternative config
 checkstyleMain.enabled = false
