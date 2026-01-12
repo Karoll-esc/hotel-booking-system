@@ -193,10 +193,9 @@ class ReservationServiceTest {
                 LocalDate.now().plusDays(50), // 45 noches
                 2
         );
-        
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(availableRoom));
 
         // When/Then - Cuando intento crear la reserva debe lanzar excepción
+        // La validación de duración ocurre antes de buscar la habitación
         assertThrows(IllegalArgumentException.class, () -> {
             reservationService.createReservation(longStayRequest);
         });
