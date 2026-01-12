@@ -1,6 +1,6 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '4.0.1'
+	id 'org.springframework.boot' version '3.4.1'
 	id 'io.spring.dependency-management' version '1.1.7'
 	id 'jacoco'
 	id 'checkstyle'
@@ -23,15 +23,13 @@ repositories {
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
-	implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server'
+	implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
-	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
 	runtimeOnly 'org.postgresql:postgresql'
-	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.security:spring-security-test'
+	testRuntimeOnly 'com.h2database:h2'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
@@ -39,6 +37,8 @@ tasks.named('test') {
 	useJUnitPlatform()
 	finalizedBy jacocoTestReport
 }
+
+check.dependsOn jacocoTestCoverageVerification
 
 // Checkstyle temporarily disabled due to DTD loading issues in Gradle
 // Re-enable once project has more classes or use alternative config
@@ -58,15 +58,59 @@ jacocoTestReport {
 	}
 }
 
+
 jacocoTestCoverageVerification {
-	violationRules {
-		rule {
-			limit {
-				minimum = 0.0 // Start with 0%, increase as you add tests
-			}
-		}
-	}
+    violationRules {
+        rule {
+            element = 'PACKAGE'
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.70
+            }
+            // Aplicar solo a la capa de aplicación (lógica de negocio)
+            includes = [
+                'com.sofka.hotel_booking_api.application.*',
+                'com.sofka.hotel_booking_api.domain.model.*'
+            ]
+        }
+        
+        rule {
+            element = 'CLASS'
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.80
+            }
+            // Services deben tener mayor cobertura
+            includes = [
+                'com.sofka.hotel_booking_api.application.service.*'
+            ]
+        }
+    }
 }
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
+    }
+    
+    // Excluir de reportes lo que no es lógica de negocio
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: [
+                '**/config/**',
+                '**/dto/**',
+                '**/controller/**',
+                '**/*Application.class'
+            ])
+        }))
+    }
+}
+
 
 checkstyle {
 	toolVersion = '10.12.5'
