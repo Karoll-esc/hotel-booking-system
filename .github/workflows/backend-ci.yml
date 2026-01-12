@@ -50,6 +50,9 @@ jobs:
         if: always()
         run: ./gradlew jacocoTestReport --no-daemon
       
+      - name: Verify code coverage (70% minimum)
+        run: ./gradlew jacocoTestCoverageVerification --no-daemon
+      
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
