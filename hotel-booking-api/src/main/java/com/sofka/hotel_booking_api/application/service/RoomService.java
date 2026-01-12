@@ -1,6 +1,7 @@
 package com.sofka.hotel_booking_api.application.service;
 
 import com.sofka.hotel_booking_api.domain.exception.DuplicateRoomNumberException;
+import com.sofka.hotel_booking_api.domain.exception.RoomNotFoundException;
 import com.sofka.hotel_booking_api.domain.model.Room;
 import com.sofka.hotel_booking_api.domain.repository.RoomRepository;
 import com.sofka.hotel_booking_api.infrastructure.dto.CreateRoomRequest;
@@ -68,5 +69,44 @@ public class RoomService {
             .stream()
             .map(RoomResponse::fromEntity)
             .collect(Collectors.toList());
+    }
+
+    /**
+     * Obtiene una habitación por su ID.
+     *
+     * @param id el ID de la habitación
+     * @return la habitación encontrada
+     * @throws RoomNotFoundException si la habitación no existe
+     */
+    @Transactional(readOnly = true)
+    public RoomResponse getRoomById(Long id) {
+        // TODO: Implementar en fase GREEN
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    /**
+     * Actualiza una habitación existente.
+     *
+     * @param id el ID de la habitación a actualizar
+     * @param request los nuevos datos de la habitación
+     * @return la habitación actualizada
+     * @throws RoomNotFoundException si la habitación no existe
+     */
+    @Transactional
+    public RoomResponse updateRoom(Long id, CreateRoomRequest request) {
+        // TODO: Implementar en fase GREEN
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    /**
+     * Elimina una habitación del sistema.
+     *
+     * @param id el ID de la habitación a eliminar
+     * @throws RoomNotFoundException si la habitación no existe
+     */
+    @Transactional
+    public void deleteRoom(Long id) {
+        // TODO: Implementar en fase GREEN
+        throw new UnsupportedOperationException("Not implemented yet");
     }
 }
