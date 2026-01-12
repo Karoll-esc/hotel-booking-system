@@ -7,6 +7,7 @@ package com.sofka.hotel_booking_api.domain.model;
 public enum RoomType {
     STANDARD("Estándar"),
     SUPERIOR("Superior"),
+    DELUXE("Deluxe"),
     SUITE("Suite");
 
     private final String displayName;
