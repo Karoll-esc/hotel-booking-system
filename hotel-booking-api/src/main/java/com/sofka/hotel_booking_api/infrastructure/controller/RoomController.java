@@ -47,4 +47,46 @@ public class RoomController {
         List<RoomResponse> rooms = roomService.getAllRooms();
         return ResponseEntity.ok(rooms);
     }
+
+    /**
+     * Endpoint para obtener una habitación por ID.
+     * GET /api/rooms/{id}
+     *
+     * @param id el ID de la habitación
+     * @return la habitación encontrada con status 200 OK
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<RoomResponse> getRoomById(@PathVariable Long id) {
+        RoomResponse response = roomService.getRoomById(id);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Endpoint para actualizar una habitación existente.
+     * PUT /api/rooms/{id}
+     *
+     * @param id el ID de la habitación a actualizar
+     * @param request los nuevos datos de la habitación
+     * @return la habitación actualizada con status 200 OK
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<RoomResponse> updateRoom(
+            @PathVariable Long id,
+            @Valid @RequestBody CreateRoomRequest request) {
+        RoomResponse response = roomService.updateRoom(id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Endpoint para eliminar una habitación.
+     * DELETE /api/rooms/{id}
+     *
+     * @param id el ID de la habitación a eliminar
+     * @return status 204 No Content
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteRoom(@PathVariable Long id) {
+        roomService.deleteRoom(id);
+        return ResponseEntity.noContent().build();
+    }
 }
