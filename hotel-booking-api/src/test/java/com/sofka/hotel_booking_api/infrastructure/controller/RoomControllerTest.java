@@ -18,8 +18,13 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -356,5 +361,126 @@ class RoomControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.error").value("Habitación no encontrada"));
+    }
+
+    // ============================================
+    // RED PHASE - Tests for Historia 2.2: Consultar estado de ocupación
+    // ============================================
+
+    @Test
+    @DisplayName("GET /api/rooms/available debe retornar habitaciones disponibles en rango de fechas")
+    void shouldReturnAvailableRoomsInDateRange() throws Exception {
+        // Given - Dado que existen habitaciones disponibles
+        LocalDate checkIn = LocalDate.of(2026, 2, 15);
+        LocalDate checkOut = LocalDate.of(2026, 2, 20);
+        
+        RoomResponse room1 = new RoomResponse(1L, "301", RoomType.SUITE, 4, new BigDecimal("250.00"), true);
+        RoomResponse room2 = new RoomResponse(2L, "302", RoomType.DELUXE, 3, new BigDecimal("200.00"), true);
+        List<RoomResponse> availableRooms = Arrays.asList(room1, room2);
+        
+        when(roomService.getAvailableRooms(eq(checkIn), eq(checkOut), eq(null)))
+                .thenReturn(availableRooms);
+
+        // When/Then - Cuando consulto disponibilidad debe retornar habitaciones disponibles
+        mockMvc.perform(get("/api/rooms/available")
+                        .param("checkIn", "2026-02-15")
+                        .param("checkOut", "2026-02-20")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].roomNumber").value("301"))
+                .andExpect(jsonPath("$[1].roomNumber").value("302"));
+    }
+
+    @Test
+    @DisplayName("GET /api/rooms/available debe filtrar por tipo de habitación")
+    void shouldFilterAvailableRoomsByType() throws Exception {
+        // Given - Dado que filtro por tipo Suite
+        LocalDate checkIn = LocalDate.of(2026, 2, 15);
+        LocalDate checkOut = LocalDate.of(2026, 2, 20);
+        
+        RoomResponse suitRoom = new RoomResponse(1L, "301", RoomType.SUITE, 4, new BigDecimal("250.00"), true);
+        List<RoomResponse> suiteRooms = Collections.singletonList(suitRoom);
+        
+        when(roomService.getAvailableRooms(eq(checkIn), eq(checkOut), eq(RoomType.SUITE)))
+                .thenReturn(suiteRooms);
+
+        // When/Then - Cuando filtro por Suite debe retornar solo habitaciones Suite
+        mockMvc.perform(get("/api/rooms/available")
+                        .param("checkIn", "2026-02-15")
+                        .param("checkOut", "2026-02-20")
+                        .param("roomType", "SUITE")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].roomType").value("SUITE"));
+    }
+
+    @Test
+    @DisplayName("GET /api/rooms/available debe retornar 400 cuando checkIn es posterior a checkOut")
+    void shouldReturn400WhenCheckInAfterCheckOut() throws Exception {
+        // Given - Dado que fecha de inicio es posterior a fecha de fin
+        LocalDate checkIn = LocalDate.of(2026, 2, 20);
+        LocalDate checkOut = LocalDate.of(2026, 2, 15);
+
+        // When/Then - Cuando envío fechas inválidas debe retornar 400
+        mockMvc.perform(get("/api/rooms/available")
+                        .param("checkIn", "2026-02-20")
+                        .param("checkOut", "2026-02-15")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").exists())
+                .andExpect(jsonPath("$.message").value("La fecha de entrada debe ser anterior a la fecha de salida"));
+    }
+
+    @Test
+    @DisplayName("GET /api/rooms/available debe retornar 400 cuando faltan parámetros obligatorios")
+    void shouldReturn400WhenMissingRequiredDateParams() throws Exception {
+        // Given - Dado que no envío los parámetros de fecha obligatorios
+
+        // When/Then - Cuando no envío checkIn o checkOut debe retornar 400
+        mockMvc.perform(get("/api/rooms/available")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("GET /api/rooms/available debe retornar lista vacía cuando no hay habitaciones disponibles")
+    void shouldReturnEmptyListWhenNoRoomsAvailable() throws Exception {
+        // Given - Dado que no hay habitaciones disponibles para las fechas solicitadas
+        LocalDate checkIn = LocalDate.of(2026, 2, 15);
+        LocalDate checkOut = LocalDate.of(2026, 2, 20);
+        
+        when(roomService.getAvailableRooms(eq(checkIn), eq(checkOut), eq(null)))
+                .thenReturn(Collections.emptyList());
+
+        // When/Then - Cuando consulto disponibilidad debe retornar lista vacía
+        mockMvc.perform(get("/api/rooms/available")
+                        .param("checkIn", "2026-02-15")
+                        .param("checkOut", "2026-02-20")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /api/rooms/available debe retornar 400 cuando checkIn es fecha pasada")
+    void shouldReturn400WhenCheckInIsInPast() throws Exception {
+        // Given - Dado que la fecha de entrada es en el pasado
+        LocalDate pastDate = LocalDate.of(2025, 12, 1);
+        LocalDate checkOut = LocalDate.of(2026, 2, 20);
+
+        // When/Then - Cuando envío fecha pasada debe retornar 400
+        mockMvc.perform(get("/api/rooms/available")
+                        .param("checkIn", "2025-12-01")
+                        .param("checkOut", "2026-02-20")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("La fecha de entrada no puede ser en el pasado"));
     }
 }

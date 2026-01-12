@@ -1,14 +1,17 @@
 package com.sofka.hotel_booking_api.application.service;
 
 import com.sofka.hotel_booking_api.domain.exception.DuplicateRoomNumberException;
+import com.sofka.hotel_booking_api.domain.exception.InvalidDateRangeException;
 import com.sofka.hotel_booking_api.domain.exception.RoomNotFoundException;
 import com.sofka.hotel_booking_api.domain.model.Room;
+import com.sofka.hotel_booking_api.domain.model.RoomType;
 import com.sofka.hotel_booking_api.domain.repository.RoomRepository;
 import com.sofka.hotel_booking_api.infrastructure.dto.CreateRoomRequest;
 import com.sofka.hotel_booking_api.infrastructure.dto.RoomResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -127,5 +130,21 @@ public class RoomService {
 
         // 2. Eliminar la habitación
         roomRepository.deleteById(id);
+    }
+
+    /**
+     * Obtiene las habitaciones disponibles en un rango de fechas.
+     * Historia 2.2: Consultar estado de ocupación de habitaciones
+     *
+     * @param checkIn fecha de entrada
+     * @param checkOut fecha de salida
+     * @param roomType tipo de habitación (opcional)
+     * @return lista de habitaciones disponibles
+     * @throws InvalidDateRangeException si el rango de fechas es inválido
+     */
+    @Transactional(readOnly = true)
+    public List<RoomResponse> getAvailableRooms(LocalDate checkIn, LocalDate checkOut, RoomType roomType) {
+        // TODO: Implementar en fase GREEN
+        throw new UnsupportedOperationException("Not implemented yet");
     }
 }
