@@ -1,6 +1,7 @@
 package com.sofka.hotel_booking_api.infrastructure.exception;
 
 import com.sofka.hotel_booking_api.domain.exception.DuplicateRoomNumberException;
+import com.sofka.hotel_booking_api.domain.exception.InvalidDateRangeException;
 import com.sofka.hotel_booking_api.domain.exception.RoomNotFoundException;
 import com.sofka.hotel_booking_api.infrastructure.constants.ValidationMessages;
 import org.springframework.http.HttpStatus;
@@ -24,6 +25,7 @@ import java.util.Map;
  * <ul>
  *   <li>{@link DuplicateRoomNumberException} → 409 CONFLICT</li>
  *   <li>{@link RoomNotFoundException} → 404 NOT FOUND</li>
+ *   <li>{@link InvalidDateRangeException} → 400 BAD REQUEST</li>
  *   <li>{@link MethodArgumentNotValidException} → 400 BAD REQUEST</li>
  * </ul>
  * 
@@ -64,6 +66,22 @@ public class GlobalExceptionHandler {
             ex.getMessage()
         );
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    /**
+     * Maneja excepciones cuando se proporciona un rango de fechas inválido.
+     * 
+     * @param ex la excepción de rango de fechas inválido
+     * @return respuesta HTTP 400 BAD REQUEST con detalles del error
+     */
+    @ExceptionHandler(InvalidDateRangeException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidDateRange(InvalidDateRangeException ex) {
+        ErrorResponse error = buildErrorResponse(
+            HttpStatus.BAD_REQUEST,
+            "Rango de fechas inválido",
+            ex.getMessage()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
     /**
