@@ -80,8 +80,9 @@ public class RoomService {
      */
     @Transactional(readOnly = true)
     public RoomResponse getRoomById(Long id) {
-        // TODO: Implementar en fase GREEN
-        throw new UnsupportedOperationException("Not implemented yet");
+        Room room = roomRepository.findById(id)
+                .orElseThrow(() -> new RoomNotFoundException(id));
+        return RoomResponse.fromEntity(room);
     }
 
     /**
@@ -94,8 +95,21 @@ public class RoomService {
      */
     @Transactional
     public RoomResponse updateRoom(Long id, CreateRoomRequest request) {
-        // TODO: Implementar en fase GREEN
-        throw new UnsupportedOperationException("Not implemented yet");
+        // 1. Verificar que la habitación existe
+        Room room = roomRepository.findById(id)
+                .orElseThrow(() -> new RoomNotFoundException(id));
+
+        // 2. Actualizar los campos de la habitación
+        room.setRoomNumber(request.getRoomNumber());
+        room.setRoomType(request.getRoomType());
+        room.setCapacity(request.getCapacity());
+        room.setPricePerNight(request.getPricePerNight());
+
+        // 3. Guardar los cambios
+        Room updatedRoom = roomRepository.save(room);
+
+        // 4. Retornar la respuesta
+        return RoomResponse.fromEntity(updatedRoom);
     }
 
     /**
@@ -106,7 +120,12 @@ public class RoomService {
      */
     @Transactional
     public void deleteRoom(Long id) {
-        // TODO: Implementar en fase GREEN
-        throw new UnsupportedOperationException("Not implemented yet");
+        // 1. Verificar que la habitación existe
+        if (!roomRepository.existsById(id)) {
+            throw new RoomNotFoundException(id);
+        }
+
+        // 2. Eliminar la habitación
+        roomRepository.deleteById(id);
     }
 }
