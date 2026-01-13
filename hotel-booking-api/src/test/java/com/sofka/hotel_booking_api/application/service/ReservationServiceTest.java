@@ -6,6 +6,7 @@ import com.sofka.hotel_booking_api.domain.model.*;
 import com.sofka.hotel_booking_api.domain.repository.GuestRepository;
 import com.sofka.hotel_booking_api.domain.repository.ReservationRepository;
 import com.sofka.hotel_booking_api.domain.repository.RoomRepository;
+import com.sofka.hotel_booking_api.infrastructure.dto.CancelReservationResponse;
 import com.sofka.hotel_booking_api.infrastructure.dto.CreateGuestRequest;
 import com.sofka.hotel_booking_api.infrastructure.dto.CreateReservationRequest;
 import com.sofka.hotel_booking_api.infrastructure.dto.ReservationResponse;
@@ -1253,9 +1254,9 @@ class ReservationServiceTest {
         assertTrue(room.getIsAvailable());
         
         // Verificar cálculo de reembolso
-        assertEquals(BigDecimal.valueOf(500.00), response.totalAmount());
-        assertEquals(BigDecimal.valueOf(500.00), response.refundAmount());
-        assertEquals(BigDecimal.ZERO, response.penaltyAmount());
+        assertEquals(0, response.totalAmount().compareTo(BigDecimal.valueOf(500.00)));
+        assertEquals(0, response.refundAmount().compareTo(BigDecimal.valueOf(500.00)));
+        assertEquals(0, response.penaltyAmount().compareTo(BigDecimal.ZERO));
         assertEquals(100, response.refundPercentage());
         
         verify(reservationRepository).save(reservation);
@@ -1293,9 +1294,9 @@ class ReservationServiceTest {
         assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
         
         // Verificar cálculo de reembolso con penalidad del 50%
-        assertEquals(BigDecimal.valueOf(600.00), response.totalAmount());
-        assertEquals(BigDecimal.valueOf(300.00), response.refundAmount());
-        assertEquals(BigDecimal.valueOf(300.00), response.penaltyAmount());
+        assertEquals(0, response.totalAmount().compareTo(BigDecimal.valueOf(600.00)));
+        assertEquals(0, response.refundAmount().compareTo(BigDecimal.valueOf(300.00)));
+        assertEquals(0, response.penaltyAmount().compareTo(BigDecimal.valueOf(300.00)));
         assertEquals(50, response.refundPercentage());
         
         verify(reservationRepository).save(reservation);
@@ -1333,9 +1334,9 @@ class ReservationServiceTest {
         assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
         
         // Verificar penalidad del 100%
-        assertEquals(BigDecimal.valueOf(300.00), response.totalAmount());
-        assertEquals(BigDecimal.ZERO, response.refundAmount());
-        assertEquals(BigDecimal.valueOf(300.00), response.penaltyAmount());
+        assertEquals(0, response.totalAmount().compareTo(BigDecimal.valueOf(300.00)));
+        assertEquals(0, response.refundAmount().compareTo(BigDecimal.ZERO));
+        assertEquals(0, response.penaltyAmount().compareTo(BigDecimal.valueOf(300.00)));
         assertEquals(0, response.refundPercentage());
         
         verify(reservationRepository).save(reservation);
@@ -1377,9 +1378,9 @@ class ReservationServiceTest {
         assertTrue(room.getIsAvailable());
         
         // Verificar penalidad del 100% para reserva activa
-        assertEquals(BigDecimal.valueOf(750.00), response.totalAmount());
-        assertEquals(BigDecimal.ZERO, response.refundAmount());
-        assertEquals(BigDecimal.valueOf(750.00), response.penaltyAmount());
+        assertEquals(0, response.totalAmount().compareTo(BigDecimal.valueOf(750.00)));
+        assertEquals(0, response.refundAmount().compareTo(BigDecimal.ZERO));
+        assertEquals(0, response.penaltyAmount().compareTo(BigDecimal.valueOf(750.00)));
         assertEquals(0, response.refundPercentage());
         
         verify(reservationRepository).save(reservation);
@@ -1555,7 +1556,7 @@ class ReservationServiceTest {
 
         // Then - 7 días = 100% reembolso (frontera superior)
         assertEquals(100, response.refundPercentage());
-        assertEquals(BigDecimal.valueOf(540.00), response.refundAmount());
-        assertEquals(BigDecimal.ZERO, response.penaltyAmount());
+        assertEquals(0, response.refundAmount().compareTo(BigDecimal.valueOf(540.00)));
+        assertEquals(0, response.penaltyAmount().compareTo(BigDecimal.ZERO));
     }
 }
