@@ -118,10 +118,41 @@ public class Reservation {
 
     /**
      * Verifica si la reserva puede ser cancelada.
+     * RN-001: Se permiten cancelaciones para PENDING, CONFIRMED y ACTIVE.
      * @return true si puede ser cancelada
      */
     public boolean isCancellable() {
-        return status == ReservationStatus.PENDING || status == ReservationStatus.CONFIRMED;
+        return status == ReservationStatus.PENDING 
+            || status == ReservationStatus.CONFIRMED 
+            || status == ReservationStatus.ACTIVE;
+    }
+
+    /**
+     * Calcula el porcentaje de reembolso según la política de cancelación RN-001.
+     * - 7+ días antes del check-in: 100% de reembolso
+     * - 2-6 días antes del check-in: 50% de reembolso
+     * - Menos de 2 días: 0% de reembolso
+     * - Reserva activa (0 días): 0% de reembolso
+     * 
+     * @return porcentaje de reembolso (0, 50, o 100)
+     */
+    public int calculateRefundPercentage() {
+        // Si la reserva está activa (check-in ya realizado), no hay reembolso
+        if (status == ReservationStatus.ACTIVE) {
+            return 0;
+        }
+        
+        // Calcular días hasta el check-in
+        long daysUntilCheckIn = ChronoUnit.DAYS.between(LocalDate.now(), checkInDate);
+        
+        // Aplicar política RN-001
+        if (daysUntilCheckIn >= 7) {
+            return 100; // Sin penalidad
+        } else if (daysUntilCheckIn >= 2) {
+            return 50;  // 50% de penalidad
+        } else {
+            return 0;   // 100% de penalidad
+        }
     }
 
     /**
