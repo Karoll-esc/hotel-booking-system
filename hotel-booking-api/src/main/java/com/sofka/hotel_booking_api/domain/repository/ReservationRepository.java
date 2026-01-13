@@ -1,6 +1,7 @@
 package com.sofka.hotel_booking_api.domain.repository;
 
 import com.sofka.hotel_booking_api.domain.model.Reservation;
+import com.sofka.hotel_booking_api.domain.model.ReservationStatus;
 import com.sofka.hotel_booking_api.domain.model.Room;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -64,4 +65,24 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
            "OR LOWER(r.guest.lastName) LIKE LOWER(CONCAT('%', :name, '%')) " +
            "ORDER BY r.checkInDate ASC")
     List<Reservation> findByGuestNameContainingIgnoreCase(@Param("name") String name);
+
+    /**
+     * Busca reservas por fecha de check-in y estado.
+     * Historia 5.2: Ver reservas del día - Check-ins de hoy
+     *
+     * @param checkInDate fecha de check-in
+     * @param status estado de la reserva (ej: CONFIRMED para llegadas)
+     * @return lista de reservas ordenadas por fecha de check-in
+     */
+    List<Reservation> findByCheckInDateAndStatusOrderByCheckInDateAsc(LocalDate checkInDate, ReservationStatus status);
+
+    /**
+     * Busca reservas por fecha de check-out y estado.
+     * Historia 5.2: Ver reservas del día - Check-outs de hoy
+     *
+     * @param checkOutDate fecha de check-out
+     * @param status estado de la reserva (ej: ACTIVE para salidas)
+     * @return lista de reservas ordenadas por fecha de check-out
+     */
+    List<Reservation> findByCheckOutDateAndStatusOrderByCheckOutDateAsc(LocalDate checkOutDate, ReservationStatus status);
 }

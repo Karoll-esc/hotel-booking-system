@@ -5,6 +5,7 @@ import com.sofka.hotel_booking_api.application.service.ReservationService;
 import com.sofka.hotel_booking_api.infrastructure.dto.ConfirmPaymentRequest;
 import com.sofka.hotel_booking_api.infrastructure.dto.CreateReservationRequest;
 import com.sofka.hotel_booking_api.infrastructure.dto.ReservationResponse;
+import com.sofka.hotel_booking_api.infrastructure.dto.TodayReservationsResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -79,5 +80,18 @@ public class ReservationController {
             @RequestParam(required = false) String guestName) {
         List<ReservationResponse> results = reservationService.searchReservations(reservationNumber, guestName);
         return ResponseEntity.ok(results);
+    }
+
+    /**
+     * Endpoint para obtener las reservas del día actual.
+     * GET /api/reservations/today
+     * Historia 5.2: Ver reservas del día
+     *
+     * @return objeto con listas de check-ins y check-outs programados para hoy
+     */
+    @GetMapping("/today")
+    public ResponseEntity<TodayReservationsResponse> getTodayReservations() {
+        TodayReservationsResponse response = reservationService.getTodayReservations();
+        return ResponseEntity.ok(response);
     }
 }
