@@ -50,4 +50,18 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
             @Param("checkInDate") LocalDate checkInDate,
             @Param("checkOutDate") LocalDate checkOutDate
     );
+
+    /**
+     * Busca reservas por nombre del huésped (firstName o lastName).
+     * Búsqueda parcial y case-insensitive.
+     * Historia 5.1: Buscar reservas por nombre de huésped
+     *
+     * @param name el nombre a buscar (firstName o lastName)
+     * @return lista de reservas ordenadas por fecha de check-in
+     */
+    @Query("SELECT r FROM Reservation r " +
+           "WHERE LOWER(r.guest.firstName) LIKE LOWER(CONCAT('%', :name, '%')) " +
+           "OR LOWER(r.guest.lastName) LIKE LOWER(CONCAT('%', :name, '%')) " +
+           "ORDER BY r.checkInDate ASC")
+    List<Reservation> findByGuestNameContainingIgnoreCase(@Param("name") String name);
 }
