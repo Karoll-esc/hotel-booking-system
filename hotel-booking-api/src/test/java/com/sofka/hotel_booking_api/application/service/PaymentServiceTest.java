@@ -62,26 +62,31 @@ class PaymentServiceTest {
     @DisplayName("Debe confirmar pago en efectivo y cambiar estado a CONFIRMED")
     void shouldConfirmPaymentInCashAndChangeStatus() {
         // Given - Reserva en estado PENDING
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(pendingReservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(pendingReservation);
+
         // When - Confirmo el pago en efectivo
-        assertThrows(UnsupportedOperationException.class, () -> {
-            paymentService.confirmPayment(1L, "CASH", new BigDecimal("625.00"), null);
-        });
+        paymentService.confirmPayment(1L, "CASH", new BigDecimal("625.00"), null);
 
         // Then - La reserva debe cambiar a estado CONFIRMED
-        // verify will be added in GREEN phase
+        assertEquals(ReservationStatus.CONFIRMED, pendingReservation.getStatus());
+        verify(reservationRepository, times(1)).findById(1L);
+        verify(reservationRepository, times(1)).save(pendingReservation);
     }
 
     @Test
     @DisplayName("Debe registrar el método de pago y la fecha de confirmación")
     void shouldRecordPaymentMethodAndConfirmationDate() {
         // Given
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(pendingReservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(pendingReservation);
+
         // When
-        assertThrows(UnsupportedOperationException.class, () -> {
-            paymentService.confirmPayment(1L, "CASH", new BigDecimal("625.00"), null);
-        });
+        paymentService.confirmPayment(1L, "CASH", new BigDecimal("625.00"), null);
 
         // Then - Debe guardar método de pago y fecha
-        // verify will be added in GREEN phase
+        assertEquals(ReservationStatus.CONFIRMED, pendingReservation.getStatus());
+        verify(reservationRepository, times(1)).save(pendingReservation);
     }
 
     // ============================================
@@ -92,13 +97,15 @@ class PaymentServiceTest {
     @DisplayName("Debe confirmar pago con tarjeta y registrar número de autorización")
     void shouldConfirmCardPaymentWithAuthorizationNumber() {
         // Given
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(pendingReservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(pendingReservation);
+
         // When - Pago con tarjeta y número de autorización
-        assertThrows(UnsupportedOperationException.class, () -> {
-            paymentService.confirmPayment(1L, "CARD", new BigDecimal("625.00"), "AUTH-789456");
-        });
+        paymentService.confirmPayment(1L, "CARD", new BigDecimal("625.00"), "AUTH-789456");
 
         // Then - Debe guardar el número de referencia
-        // verify will be added in GREEN phase
+        assertEquals(ReservationStatus.CONFIRMED, pendingReservation.getStatus());
+        verify(reservationRepository, times(1)).save(pendingReservation);
     }
 
     @Test
@@ -106,9 +113,11 @@ class PaymentServiceTest {
     void shouldThrowExceptionWhenCardPaymentWithoutAuthorizationNumber() {
         // Given
         // When/Then - Sin número de autorización debe fallar
-        assertThrows(UnsupportedOperationException.class, () -> {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
             paymentService.confirmPayment(1L, "CARD", new BigDecimal("625.00"), null);
         });
+        
+        assertTrue(exception.getMessage().contains("requiere un número de referencia"));
     }
 
     // ============================================
@@ -119,13 +128,15 @@ class PaymentServiceTest {
     @DisplayName("Debe confirmar pago por transferencia y registrar comprobante")
     void shouldConfirmTransferPaymentWithReceipt() {
         // Given
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(pendingReservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(pendingReservation);
+
         // When - Pago por transferencia con comprobante
-        assertThrows(UnsupportedOperationException.class, () -> {
-            paymentService.confirmPayment(1L, "TRANSFER", new BigDecimal("625.00"), "TRF-2026-001234");
-        });
+        paymentService.confirmPayment(1L, "TRANSFER", new BigDecimal("625.00"), "TRF-2026-001234");
 
         // Then - Debe guardar el comprobante
-        // verify will be added in GREEN phase
+        assertEquals(ReservationStatus.CONFIRMED, pendingReservation.getStatus());
+        verify(reservationRepository, times(1)).save(pendingReservation);
     }
 
     @Test
@@ -133,9 +144,11 @@ class PaymentServiceTest {
     void shouldThrowExceptionWhenTransferPaymentWithoutReceipt() {
         // Given
         // When/Then - Sin comprobante debe fallar
-        assertThrows(UnsupportedOperationException.class, () -> {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
             paymentService.confirmPayment(1L, "TRANSFER", new BigDecimal("625.00"), null);
         });
+        
+        assertTrue(exception.getMessage().contains("requiere un número de referencia"));
     }
 
     // ============================================
@@ -146,8 +159,10 @@ class PaymentServiceTest {
     @DisplayName("Debe lanzar excepción si la reserva no existe")
     void shouldThrowExceptionWhenReservationNotFound() {
         // Given - No existe la reserva
+        when(reservationRepository.findById(999L)).thenReturn(Optional.empty());
+
         // When/Then
-        assertThrows(UnsupportedOperationException.class, () -> {
+        assertThrows(RuntimeException.class, () -> {
             paymentService.confirmPayment(999L, "CASH", new BigDecimal("625.00"), null);
         });
     }
@@ -156,30 +171,53 @@ class PaymentServiceTest {
     @DisplayName("Debe lanzar excepción si la reserva está expirada")
     void shouldThrowExceptionWhenReservationIsExpired() {
         // Given - Reserva expirada
+        Reservation expiredReservation = new Reservation(
+                "RES-2026-002",
+                guest,
+                room,
+                LocalDate.now().plusDays(5),
+                LocalDate.now().plusDays(10),
+                2,
+                new BigDecimal("625.00")
+        );
+        expiredReservation.expire();
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(expiredReservation));
+
         // When/Then
-        assertThrows(UnsupportedOperationException.class, () -> {
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
             paymentService.confirmPayment(1L, "CASH", new BigDecimal("625.00"), null);
         });
+        
+        assertTrue(exception.getMessage().contains("expirado"));
     }
 
     @Test
     @DisplayName("Debe lanzar excepción si el monto no coincide con el total de la reserva")
     void shouldThrowExceptionWhenAmountDoesNotMatch() {
         // Given - Monto incorrecto
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(pendingReservation));
+
         // When/Then - Monto diferente al total
-        assertThrows(UnsupportedOperationException.class, () -> {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
             paymentService.confirmPayment(1L, "CASH", new BigDecimal("500.00"), null);
         });
+        
+        assertTrue(exception.getMessage().contains("no coincide"));
     }
 
     @Test
     @DisplayName("Debe lanzar excepción si intenta confirmar pago de reserva ya confirmada")
     void shouldThrowExceptionWhenReservationAlreadyConfirmed() {
         // Given - Reserva ya pagada
+        pendingReservation.confirmPayment();
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(pendingReservation));
+
         // When/Then
-        assertThrows(UnsupportedOperationException.class, () -> {
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
             paymentService.confirmPayment(1L, "CASH", new BigDecimal("625.00"), null);
         });
+        
+        assertTrue(exception.getMessage().contains("confirmado"));
     }
 
     @Test
@@ -187,8 +225,10 @@ class PaymentServiceTest {
     void shouldThrowExceptionWhenPaymentMethodIsInvalid() {
         // Given
         // When/Then - Método de pago inválido
-        assertThrows(UnsupportedOperationException.class, () -> {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
             paymentService.confirmPayment(1L, "CRYPTO", new BigDecimal("625.00"), null);
         });
+        
+        assertTrue(exception.getMessage().contains("inválido"));
     }
 }
