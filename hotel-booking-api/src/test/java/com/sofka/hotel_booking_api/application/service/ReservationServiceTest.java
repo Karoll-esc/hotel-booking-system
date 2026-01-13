@@ -998,4 +998,219 @@ class ReservationServiceTest {
         verify(reservationRepository, never()).save(any(Reservation.class));
         verify(roomRepository, never()).save(any(Room.class));
     }
+
+    // ========== Historia 4.3: Realizar check-out del huésped - Fase RED ==========
+
+    @Test
+    @DisplayName("Check-out exitoso - reserva activa con fecha de salida hoy")
+    void shouldCheckOutSuccessfully() {
+        // Given - Dada una reserva activa con check-out hoy
+        LocalDate today = LocalDate.now();
+        Room room = new Room("101", RoomType.STANDARD, 2, BigDecimal.valueOf(100));
+        room.setId(1L);
+        room.setIsAvailable(false); // Ocupada
+
+        Guest guest = new Guest("Juan", "Pérez", "12345678", "juan@email.com", "+123456789");
+        guest.setId(1L);
+
+        Reservation reservation = new Reservation(
+                "RES-2026-001",
+                guest,
+                room,
+                today.minusDays(3),
+                today,
+                2,
+                BigDecimal.valueOf(300)
+        );
+        reservation.setId(1L);
+        reservation.confirmPayment();
+        reservation.checkIn(); // Estado ACTIVE
+
+        // When - Cuando realizo el check-out
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
+        when(roomRepository.save(any(Room.class))).thenReturn(room);
+
+        reservationService.checkOut(1L);
+
+        // Then - Entonces la reserva cambia a COMPLETED, se registra checkOutTime y la habitación queda disponible
+        assertEquals(ReservationStatus.COMPLETED, reservation.getStatus());
+        assertNotNull(reservation.getCheckOutTime());
+        assertTrue(room.getIsAvailable());
+        verify(reservationRepository).save(reservation);
+        verify(roomRepository).save(room);
+    }
+
+    @Test
+    @DisplayName("Check-out debe fallar si el check-in no se ha realizado")
+    void shouldThrowExceptionWhenCheckOutWithoutCheckIn() {
+        // Given - Dada una reserva en estado CONFIRMED (sin check-in)
+        LocalDate today = LocalDate.now();
+        Room room = new Room("101", RoomType.STANDARD, 2, BigDecimal.valueOf(100));
+        room.setId(1L);
+
+        Guest guest = new Guest("Juan", "Pérez", "12345678", "juan@email.com", "+123456789");
+        guest.setId(1L);
+
+        Reservation reservation = new Reservation(
+                "RES-2026-001",
+                guest,
+                room,
+                today,
+                today.plusDays(2),
+                2,
+                BigDecimal.valueOf(200)
+        );
+        reservation.setId(1L);
+        reservation.confirmPayment(); // Estado CONFIRMED, NO se hace check-in
+
+        // When - Cuando intento realizar el check-out
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+
+        // Then - Entonces debe lanzar excepción
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> reservationService.checkOut(1L)
+        );
+        assertEquals("Solo se puede hacer check-out en reservas ACTIVAS", exception.getMessage());
+        verify(reservationRepository, never()).save(any(Reservation.class));
+        verify(roomRepository, never()).save(any(Room.class));
+    }
+
+    @Test
+    @DisplayName("Check-out debe fallar si la reserva no existe")
+    void shouldThrowExceptionWhenReservationNotFoundForCheckOut() {
+        // Given - Dado un ID de reserva inexistente
+        Long nonExistentId = 999L;
+
+        // When - Cuando intento realizar el check-out
+        when(reservationRepository.findById(nonExistentId)).thenReturn(Optional.empty());
+
+        // Then - Entonces debe lanzar excepción
+        assertThrows(
+                com.sofka.hotel_booking_api.domain.exception.ReservationNotFoundException.class,
+                () -> reservationService.checkOut(nonExistentId)
+        );
+        verify(reservationRepository, never()).save(any(Reservation.class));
+        verify(roomRepository, never()).save(any(Room.class));
+    }
+
+    @Test
+    @DisplayName("Check-out debe actualizar la disponibilidad de la habitación a true")
+    void shouldUpdateRoomAvailabilityAfterCheckOut() {
+        // Given - Dada una reserva activa con habitación ocupada
+        LocalDate today = LocalDate.now();
+        Room room = new Room("101", RoomType.STANDARD, 2, BigDecimal.valueOf(100));
+        room.setId(1L);
+        room.setIsAvailable(false); // Ocupada
+
+        Guest guest = new Guest("Juan", "Pérez", "12345678", "juan@email.com", "+123456789");
+        guest.setId(1L);
+
+        Reservation reservation = new Reservation(
+                "RES-2026-001",
+                guest,
+                room,
+                today.minusDays(3),
+                today,
+                2,
+                BigDecimal.valueOf(300)
+        );
+        reservation.setId(1L);
+        reservation.confirmPayment();
+        reservation.checkIn();
+
+        // When - Cuando realizo el check-out
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
+        when(roomRepository.save(any(Room.class))).thenReturn(room);
+
+        reservationService.checkOut(1L);
+
+        // Then - Entonces la habitación debe cambiar a disponible
+        assertTrue(room.getIsAvailable());
+        verify(roomRepository).save(room);
+    }
+
+    @Test
+    @DisplayName("Check-out anticipado debe permitirse (flexible checkout)")
+    void shouldAllowEarlyCheckOut() {
+        // Given - Dada una reserva activa con fecha de salida mañana
+        LocalDate today = LocalDate.now();
+        LocalDate tomorrow = today.plusDays(1);
+        Room room = new Room("101", RoomType.STANDARD, 2, BigDecimal.valueOf(100));
+        room.setId(1L);
+        room.setIsAvailable(false);
+
+        Guest guest = new Guest("Juan", "Pérez", "12345678", "juan@email.com", "+123456789");
+        guest.setId(1L);
+
+        Reservation reservation = new Reservation(
+                "RES-2026-001",
+                guest,
+                room,
+                today.minusDays(2),
+                tomorrow, // Checkout programado para mañana
+                2,
+                BigDecimal.valueOf(300)
+        );
+        reservation.setId(1L);
+        reservation.confirmPayment();
+        reservation.checkIn();
+
+        // When - Cuando realizo el check-out anticipado hoy
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
+        when(roomRepository.save(any(Room.class))).thenReturn(room);
+
+        reservationService.checkOut(1L);
+
+        // Then - Entonces el check-out se completa exitosamente
+        assertEquals(ReservationStatus.COMPLETED, reservation.getStatus());
+        assertNotNull(reservation.getCheckOutTime());
+        assertTrue(room.getIsAvailable());
+        verify(reservationRepository).save(reservation);
+        verify(roomRepository).save(room);
+    }
+
+    @Test
+    @DisplayName("Check-out tardío debe permitirse (flexible checkout)")
+    void shouldAllowLateCheckOut() {
+        // Given - Dada una reserva activa con fecha de salida ayer
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
+        Room room = new Room("101", RoomType.STANDARD, 2, BigDecimal.valueOf(100));
+        room.setId(1L);
+        room.setIsAvailable(false);
+
+        Guest guest = new Guest("Juan", "Pérez", "12345678", "juan@email.com", "+123456789");
+        guest.setId(1L);
+
+        Reservation reservation = new Reservation(
+                "RES-2026-001",
+                guest,
+                room,
+                today.minusDays(5),
+                yesterday, // Checkout programado para ayer (tarde)
+                2,
+                BigDecimal.valueOf(500)
+        );
+        reservation.setId(1L);
+        reservation.confirmPayment();
+        reservation.checkIn();
+
+        // When - Cuando realizo el check-out tardío hoy
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
+        when(roomRepository.save(any(Room.class))).thenReturn(room);
+
+        reservationService.checkOut(1L);
+
+        // Then - Entonces el check-out se completa exitosamente
+        assertEquals(ReservationStatus.COMPLETED, reservation.getStatus());
+        assertNotNull(reservation.getCheckOutTime());
+        assertTrue(room.getIsAvailable());
+        verify(reservationRepository).save(reservation);
+        verify(roomRepository).save(room);
+    }
 }
