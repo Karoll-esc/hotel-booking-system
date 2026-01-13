@@ -19,6 +19,12 @@ export default defineConfig({
         '**/*.config.*',
         '**/main.tsx',
       ],
+      thresholds: {
+        lines: 70,
+        functions: 70,
+        branches: 70,
+        statements: 70,
+      },
     },
   },
 })
