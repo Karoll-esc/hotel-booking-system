@@ -200,4 +200,57 @@ public class ReservationService {
         
         return new TodayReservationsResponse(checkIns, checkOuts);
     }
+
+    /**
+     * Realiza el check-in de una reserva.
+     * Validación estricta: solo permite check-in en la fecha programada.
+     * Historia 4.2: Realizar check-in del huésped
+     *
+     * @param reservationId ID de la reserva
+     * @throws com.sofka.hotel_booking_api.domain.exception.ReservationNotFoundException si la reserva no existe
+     * @throws IllegalStateException si la reserva no está en estado CONFIRMED o si la fecha no es hoy o si la habitación está ocupada
+     */
+    @Transactional
+    public void checkIn(Long reservationId) {
+        // 1. Buscar la reserva
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new com.sofka.hotel_booking_api.domain.exception.ReservationNotFoundException(
+                        "Reservation not found with id: " + reservationId));
+
+        // 2. Validación estricta: check-in solo en la fecha programada
+        LocalDate today = LocalDate.now();
+        if (!reservation.getCheckInDate().equals(today)) {
+            throw new IllegalStateException(
+                    "Check-in can only be performed on the check-in date. Expected: " 
+                    + reservation.getCheckInDate() + ", but today is: " + today);
+        }
+
+        // 3. Verificar que la habitación no esté ocupada por otra reserva activa
+        List<Reservation> overlappingReservations = reservationRepository.findOverlappingReservations(
+                reservation.getRoom(),
+                reservation.getCheckInDate(),
+                reservation.getCheckOutDate()
+        );
+
+        // Filtrar solo reservas ACTIVE que no sean esta misma reserva
+        boolean roomOccupied = overlappingReservations.stream()
+                .filter(r -> !r.getId().equals(reservationId))
+                .anyMatch(r -> r.getStatus() == ReservationStatus.ACTIVE);
+
+        if (roomOccupied) {
+            throw new IllegalStateException(
+                    "Room is occupied by another active reservation. Cannot perform check-in.");
+        }
+
+        // 4. Realizar check-in (valida que esté en estado CONFIRMED)
+        reservation.checkIn();
+
+        // 5. Marcar habitación como no disponible
+        Room room = reservation.getRoom();
+        room.setIsAvailable(false);
+
+        // 6. Guardar cambios
+        reservationRepository.save(reservation);
+        roomRepository.save(room);
+    }
 }
