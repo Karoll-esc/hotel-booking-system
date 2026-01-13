@@ -9,6 +9,7 @@ import com.sofka.hotel_booking_api.domain.repository.RoomRepository;
 import com.sofka.hotel_booking_api.infrastructure.dto.CreateGuestRequest;
 import com.sofka.hotel_booking_api.infrastructure.dto.CreateReservationRequest;
 import com.sofka.hotel_booking_api.infrastructure.dto.ReservationResponse;
+import com.sofka.hotel_booking_api.infrastructure.dto.TodayReservationsResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -516,5 +517,231 @@ class ReservationServiceTest {
         assertNotNull(results);
         assertEquals(2, results.size());
         assertTrue(results.get(0).checkInDate().isBefore(results.get(1).checkInDate()));
+    }
+
+    // ============================================
+    // RED PHASE - Historia 5.2: Ver reservas del día
+    // ============================================
+
+    @Test
+    @DisplayName("Debe mostrar check-ins programados para hoy")
+    void shouldShowCheckInsForToday() {
+        // Given - Dado que existen reservas con entrada para hoy en estado CONFIRMED
+        LocalDate today = LocalDate.now();
+        
+        Reservation reservation1 = new Reservation(
+                "RES-2026-001",
+                guest,
+                availableRoom,
+                today,  // Check-in hoy
+                today.plusDays(3),
+                2,
+                new BigDecimal("750.00")
+        );
+        reservation1.setId(1L);
+        // Reservation starts in PENDING, needs to be confirmed
+        // Simulating confirmed payment
+        reservation1.setStatus(ReservationStatus.CONFIRMED);
+
+        Reservation reservation2 = new Reservation(
+                "RES-2026-002",
+                guest,
+                availableRoom,
+                today,  // Check-in hoy
+                today.plusDays(5),
+                2,
+                new BigDecimal("1250.00")
+        );
+        reservation2.setId(2L);
+        reservation2.setStatus(ReservationStatus.CONFIRMED);
+
+        when(reservationRepository.findByCheckInDateAndStatus(today, ReservationStatus.CONFIRMED))
+                .thenReturn(Arrays.asList(reservation1, reservation2));
+        when(reservationRepository.findByCheckOutDateAndStatus(today, ReservationStatus.ACTIVE))
+                .thenReturn(Collections.emptyList());
+
+        // When - Cuando consulto las reservas del día
+        TodayReservationsResponse response = reservationService.getTodayReservations();
+
+        // Then - Entonces veo las llegadas programadas
+        assertNotNull(response);
+        assertNotNull(response.checkIns());
+        assertEquals(2, response.checkIns().size());
+        assertEquals("RES-2026-001", response.checkIns().get(0).reservationNumber());
+        assertEquals(today, response.checkIns().get(0).checkInDate());
+        assertEquals(ReservationStatus.CONFIRMED, response.checkIns().get(0).status());
+        
+        // Y no hay salidas
+        assertNotNull(response.checkOuts());
+        assertTrue(response.checkOuts().isEmpty());
+        
+        verify(reservationRepository).findByCheckInDateAndStatus(today, ReservationStatus.CONFIRMED);
+        verify(reservationRepository).findByCheckOutDateAndStatus(today, ReservationStatus.ACTIVE);
+    }
+
+    @Test
+    @DisplayName("Debe mostrar check-outs programados para hoy")
+    void shouldShowCheckOutsForToday() {
+        // Given - Dado que existen reservas con salida para hoy en estado ACTIVE
+        LocalDate today = LocalDate.now();
+        
+        Reservation activeReservation1 = new Reservation(
+                "RES-2026-003",
+                guest,
+                availableRoom,
+                today.minusDays(3),
+                today,  // Check-out hoy
+                2,
+                new BigDecimal("750.00")
+        );
+        activeReservation1.setId(3L);
+        activeReservation1.setStatus(ReservationStatus.ACTIVE);  // Ya hizo check-in
+
+        Reservation activeReservation2 = new Reservation(
+                "RES-2026-004",
+                guest,
+                availableRoom,
+                today.minusDays(5),
+                today,  // Check-out hoy
+                2,
+                new BigDecimal("1250.00")
+        );
+        activeReservation2.setId(4L);
+        activeReservation2.setStatus(ReservationStatus.ACTIVE);
+
+        when(reservationRepository.findByCheckInDateAndStatus(today, ReservationStatus.CONFIRMED))
+                .thenReturn(Collections.emptyList());
+        when(reservationRepository.findByCheckOutDateAndStatus(today, ReservationStatus.ACTIVE))
+                .thenReturn(Arrays.asList(activeReservation1, activeReservation2));
+
+        // When - Cuando consulto las reservas del día
+        TodayReservationsResponse response = reservationService.getTodayReservations();
+
+        // Then - Entonces veo las salidas programadas
+        assertNotNull(response);
+        assertNotNull(response.checkOuts());
+        assertEquals(2, response.checkOuts().size());
+        assertEquals("RES-2026-003", response.checkOuts().get(0).reservationNumber());
+        assertEquals(today, response.checkOuts().get(0).checkOutDate());
+        assertEquals(ReservationStatus.ACTIVE, response.checkOuts().get(0).status());
+        
+        // Y no hay llegadas
+        assertNotNull(response.checkIns());
+        assertTrue(response.checkIns().isEmpty());
+        
+        verify(reservationRepository).findByCheckInDateAndStatus(today, ReservationStatus.CONFIRMED);
+        verify(reservationRepository).findByCheckOutDateAndStatus(today, ReservationStatus.ACTIVE);
+    }
+
+    @Test
+    @DisplayName("Debe mostrar tanto check-ins como check-outs cuando ambos existen")
+    void shouldShowBothCheckInsAndCheckOutsForToday() {
+        // Given - Dado que hay llegadas y salidas para hoy
+        LocalDate today = LocalDate.now();
+        
+        // Check-in para hoy (CONFIRMED)
+        Reservation checkInReservation = new Reservation(
+                "RES-2026-005",
+                guest,
+                availableRoom,
+                today,
+                today.plusDays(2),
+                2,
+                new BigDecimal("500.00")
+        );
+        checkInReservation.setId(5L);
+        checkInReservation.setStatus(ReservationStatus.CONFIRMED);
+
+        // Check-out para hoy (ACTIVE)
+        Reservation checkOutReservation = new Reservation(
+                "RES-2026-006",
+                guest,
+                availableRoom,
+                today.minusDays(2),
+                today,
+                2,
+                new BigDecimal("500.00")
+        );
+        checkOutReservation.setId(6L);
+        checkOutReservation.setStatus(ReservationStatus.ACTIVE);
+
+        when(reservationRepository.findByCheckInDateAndStatus(today, ReservationStatus.CONFIRMED))
+                .thenReturn(Collections.singletonList(checkInReservation));
+        when(reservationRepository.findByCheckOutDateAndStatus(today, ReservationStatus.ACTIVE))
+                .thenReturn(Collections.singletonList(checkOutReservation));
+
+        // When - Cuando consulto las reservas del día
+        TodayReservationsResponse response = reservationService.getTodayReservations();
+
+        // Then - Entonces veo ambas listas pobladas
+        assertNotNull(response);
+        assertEquals(1, response.checkIns().size());
+        assertEquals(1, response.checkOuts().size());
+        assertEquals("RES-2026-005", response.checkIns().get(0).reservationNumber());
+        assertEquals("RES-2026-006", response.checkOuts().get(0).reservationNumber());
+    }
+
+    @Test
+    @DisplayName("Debe retornar listas vacías cuando no hay reservas para hoy")
+    void shouldReturnEmptyListsWhenNoReservationsForToday() {
+        // Given - Dado que no hay reservas para hoy
+        LocalDate today = LocalDate.now();
+        
+        when(reservationRepository.findByCheckInDateAndStatus(today, ReservationStatus.CONFIRMED))
+                .thenReturn(Collections.emptyList());
+        when(reservationRepository.findByCheckOutDateAndStatus(today, ReservationStatus.ACTIVE))
+                .thenReturn(Collections.emptyList());
+
+        // When - Cuando consulto las reservas del día
+        TodayReservationsResponse response = reservationService.getTodayReservations();
+
+        // Then - Entonces recibo listas vacías (no null)
+        assertNotNull(response);
+        assertNotNull(response.checkIns());
+        assertNotNull(response.checkOuts());
+        assertTrue(response.checkIns().isEmpty());
+        assertTrue(response.checkOuts().isEmpty());
+    }
+
+    @Test
+    @DisplayName("No debe incluir reservas PENDING en check-ins del día")
+    void shouldNotIncludePendingReservationsInCheckIns() {
+        // Given - Dado que hay una reserva PENDING para hoy (no debe aparecer)
+        LocalDate today = LocalDate.now();
+        
+        // Solo busca CONFIRMED, no PENDING
+        when(reservationRepository.findByCheckInDateAndStatus(today, ReservationStatus.CONFIRMED))
+                .thenReturn(Collections.emptyList());
+        when(reservationRepository.findByCheckOutDateAndStatus(today, ReservationStatus.ACTIVE))
+                .thenReturn(Collections.emptyList());
+
+        // When - Cuando consulto las reservas del día
+        TodayReservationsResponse response = reservationService.getTodayReservations();
+
+        // Then - Entonces no hay check-ins (porque PENDING no cuenta)
+        assertTrue(response.checkIns().isEmpty());
+        verify(reservationRepository).findByCheckInDateAndStatus(today, ReservationStatus.CONFIRMED);
+        verify(reservationRepository, never()).findByCheckInDateAndStatus(today, ReservationStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("No debe incluir reservas CONFIRMED en check-outs del día")
+    void shouldNotIncludeConfirmedReservationsInCheckOuts() {
+        // Given - Dado que hay una reserva CONFIRMED con salida hoy (no debe aparecer en salidas)
+        LocalDate today = LocalDate.now();
+        
+        // Solo busca ACTIVE para check-outs, no CONFIRMED
+        when(reservationRepository.findByCheckInDateAndStatus(today, ReservationStatus.CONFIRMED))
+                .thenReturn(Collections.emptyList());
+        when(reservationRepository.findByCheckOutDateAndStatus(today, ReservationStatus.ACTIVE))
+                .thenReturn(Collections.emptyList());
+
+        // When - Cuando consulto las reservas del día
+        TodayReservationsResponse response = reservationService.getTodayReservations();
+
+        // Then - Entonces no hay check-outs (porque CONFIRMED no está activa aún)
+        assertTrue(response.checkOuts().isEmpty());
+        verify(reservationRepository).findByCheckOutDateAndStatus(today, ReservationStatus.ACTIVE);
+        verify(reservationRepository, never()).findByCheckOutDateAndStatus(today, ReservationStatus.CONFIRMED);
     }
 }
