@@ -94,4 +94,18 @@ public class ReservationController {
         TodayReservationsResponse response = reservationService.getTodayReservations();
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Endpoint para realizar el check-in de una reserva.
+     * POST /api/reservations/{id}/check-in
+     * Historia 4.2: Realizar check-in del huésped
+     *
+     * @param id ID de la reserva
+     * @return 200 OK cuando el check-in se realiza exitosamente
+     */
+    @PostMapping("/{id}/check-in")
+    public ResponseEntity<Void> checkIn(@PathVariable Long id) {
+        reservationService.checkIn(id);
+        return ResponseEntity.ok().build();
+    }
 }
