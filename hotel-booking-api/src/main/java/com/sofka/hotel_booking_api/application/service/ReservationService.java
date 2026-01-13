@@ -16,8 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Servicio para gestionar las reservas del hotel.
@@ -132,5 +134,39 @@ public class ReservationService {
         String year = String.valueOf(LocalDate.now().getYear());
         String uniqueId = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
         return String.format("RES-%s-%s", year, uniqueId);
+    }
+
+    /**
+     * Busca reservas por número de reserva o nombre de huésped.
+     * Historia 5.1: Buscar reservas existentes
+     * 
+     * @param reservationNumber número de reserva (búsqueda exacta, opcional)
+     * @param guestName nombre o apellido del huésped (búsqueda parcial, opcional)
+     * @return lista de reservas que coinciden con los criterios (puede estar vacía)
+     * @throws IllegalArgumentException si no se proporciona ningún criterio de búsqueda
+     */
+    @Transactional(readOnly = true)
+    public List<ReservationResponse> searchReservations(String reservationNumber, String guestName) {
+        // Validar que al menos un criterio de búsqueda esté presente
+        if (reservationNumber == null && guestName == null) {
+            throw new IllegalArgumentException(
+                "Debe proporcionar al menos un criterio de búsqueda: número de reserva o nombre del huésped"
+            );
+        }
+
+        // Priorizar búsqueda por número de reserva (búsqueda exacta)
+        if (reservationNumber != null) {
+            return reservationRepository.findByReservationNumber(reservationNumber)
+                    .map(ReservationResponse::fromEntity)
+                    .map(Collections::singletonList)
+                    .orElse(Collections.emptyList());
+        }
+
+        // Búsqueda por nombre de huésped (parcial, case-insensitive)
+        List<Reservation> reservations = reservationRepository.findByGuestNameContainingIgnoreCase(guestName);
+        
+        return reservations.stream()
+                .map(ReservationResponse::fromEntity)
+                .collect(Collectors.toList());
     }
 }
