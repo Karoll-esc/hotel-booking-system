@@ -822,7 +822,7 @@ class ReservationServiceTest {
                 IllegalStateException.class,
                 () -> reservationService.checkIn(1L)
         );
-        assertEquals("Cannot check-in: reservation must be in CONFIRMED status", exception.getMessage());
+        assertEquals("Solo se puede hacer check-in en reservas CONFIRMADAS", exception.getMessage());
         verify(reservationRepository, never()).save(any(Reservation.class));
         verify(roomRepository, never()).save(any(Room.class));
     }
