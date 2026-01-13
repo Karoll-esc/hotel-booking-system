@@ -10,6 +10,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * Controlador REST para gestionar reservas del hotel.
  * Historia 3.1: Crear reserva
@@ -60,5 +62,22 @@ public class ReservationController {
                 request.reference()
         );
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Endpoint para buscar reservas por diferentes criterios.
+     * GET /api/reservations/search?reservationNumber=XXX&guestName=YYY
+     * Historia 5.1: Buscar reservas existentes
+     *
+     * @param reservationNumber número de reserva (opcional, búsqueda exacta)
+     * @param guestName nombre o apellido del huésped (opcional, búsqueda parcial case-insensitive)
+     * @return lista de reservas que coinciden con los criterios (puede estar vacía)
+     */
+    @GetMapping("/search")
+    public ResponseEntity<List<ReservationResponse>> searchReservations(
+            @RequestParam(required = false) String reservationNumber,
+            @RequestParam(required = false) String guestName) {
+        List<ReservationResponse> results = reservationService.searchReservations(reservationNumber, guestName);
+        return ResponseEntity.ok(results);
     }
 }
