@@ -744,4 +744,240 @@ class ReservationServiceTest {
         verify(reservationRepository).findByCheckOutDateAndStatusOrderByCheckOutDateAsc(today, ReservationStatus.ACTIVE);
         verify(reservationRepository, never()).findByCheckOutDateAndStatusOrderByCheckOutDateAsc(today, ReservationStatus.CONFIRMED);
     }
+
+    // ========== Historia 4.2: Realizar check-in del huésped - Fase RED ==========
+
+    @Test
+    @DisplayName("Check-in exitoso - reserva confirmada con fecha de entrada hoy")
+    void shouldCheckInSuccessfully() {
+        // Given - Dada una reserva confirmada con check-in hoy
+        LocalDate today = LocalDate.now();
+        Room room = new Room("101", RoomType.STANDARD, 2, BigDecimal.valueOf(100));
+        room.setId(1L);
+        room.setIsAvailable(true);
+
+        Guest guest = new Guest("Juan", "Pérez", "12345678", "juan@email.com", "+123456789");
+        guest.setId(1L);
+
+        Reservation reservation = new Reservation(
+                "RES-2026-001",
+                guest,
+                room,
+                today,
+                today.plusDays(2),
+                2,
+                BigDecimal.valueOf(200)
+        );
+        reservation.setId(1L);
+        reservation.confirmPayment();
+
+        // When - Cuando realizo el check-in
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.findOverlappingReservations(
+                room,
+                today,
+                today.plusDays(2)
+        )).thenReturn(Collections.emptyList());
+        when(roomRepository.save(any(Room.class))).thenReturn(room);
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
+
+        reservationService.checkIn(1L);
+
+        // Then - Entonces la reserva cambia a ACTIVE, se registra checkInTime y la habitación queda ocupada
+        assertEquals(ReservationStatus.ACTIVE, reservation.getStatus());
+        assertNotNull(reservation.getCheckInTime());
+        assertFalse(room.getIsAvailable());
+        verify(reservationRepository).save(reservation);
+        verify(roomRepository).save(room);
+    }
+
+    @Test
+    @DisplayName("Check-in debe fallar si la reserva no está confirmada")
+    void shouldThrowExceptionWhenCheckInNotConfirmed() {
+        // Given - Dada una reserva en estado PENDING
+        LocalDate today = LocalDate.now();
+        Room room = new Room("101", RoomType.STANDARD, 2, BigDecimal.valueOf(100));
+        room.setId(1L);
+
+        Guest guest = new Guest("Juan", "Pérez", "12345678", "juan@email.com", "+123456789");
+        guest.setId(1L);
+
+        Reservation reservation = new Reservation(
+                "RES-2026-001",
+                guest,
+                room,
+                today,
+                today.plusDays(2),
+                2,
+                BigDecimal.valueOf(200)
+        );
+        reservation.setId(1L);
+        // No se confirma el pago - permanece en PENDING
+
+        // When - Cuando intento realizar el check-in
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+
+        // Then - Entonces debe lanzar excepción
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> reservationService.checkIn(1L)
+        );
+        assertEquals("Cannot check-in: reservation must be in CONFIRMED status", exception.getMessage());
+        verify(reservationRepository, never()).save(any(Reservation.class));
+        verify(roomRepository, never()).save(any(Room.class));
+    }
+
+    @Test
+    @DisplayName("Check-in debe fallar si la reserva no existe")
+    void shouldThrowExceptionWhenReservationNotFoundForCheckIn() {
+        // Given - Dado un ID de reserva inexistente
+        Long nonExistentId = 999L;
+
+        // When - Cuando intento realizar el check-in
+        when(reservationRepository.findById(nonExistentId)).thenReturn(Optional.empty());
+
+        // Then - Entonces debe lanzar excepción
+        assertThrows(
+                com.sofka.hotel_booking_api.domain.exception.ReservationNotFoundException.class,
+                () -> reservationService.checkIn(nonExistentId)
+        );
+        verify(reservationRepository, never()).save(any(Reservation.class));
+        verify(roomRepository, never()).save(any(Room.class));
+    }
+
+    @Test
+    @DisplayName("Check-in debe fallar si la habitación está ocupada por otra reserva activa")
+    void shouldThrowExceptionWhenRoomOccupied() {
+        // Given - Dada una reserva confirmada pero la habitación está ocupada
+        LocalDate today = LocalDate.now();
+        Room room = new Room("101", RoomType.STANDARD, 2, BigDecimal.valueOf(100));
+        room.setId(1L);
+
+        Guest guest1 = new Guest("Juan", "Pérez", "12345678", "juan@email.com", "+123456789");
+        guest1.setId(1L);
+
+        Guest guest2 = new Guest("María", "García", "87654321", "maria@email.com", "+987654321");
+        guest2.setId(2L);
+
+        // Reserva que queremos hacer check-in
+        Reservation reservation = new Reservation(
+                "RES-2026-001",
+                guest1,
+                room,
+                today,
+                today.plusDays(2),
+                2,
+                BigDecimal.valueOf(200)
+        );
+        reservation.setId(1L);
+        reservation.confirmPayment();
+
+        // Otra reserva activa que ocupa la misma habitación
+        Reservation overlappingReservation = new Reservation(
+                "RES-2026-002",
+                guest2,
+                room,
+                today.minusDays(1),
+                today.plusDays(1),
+                2,
+                BigDecimal.valueOf(200)
+        );
+        overlappingReservation.setId(2L);
+        overlappingReservation.confirmPayment();
+        overlappingReservation.checkIn(); // Ya hizo check-in - estado ACTIVE
+
+        // When - Cuando intento realizar el check-in
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.findOverlappingReservations(
+                room,
+                today,
+                today.plusDays(2)
+        )).thenReturn(List.of(overlappingReservation));
+
+        // Then - Entonces debe lanzar excepción
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> reservationService.checkIn(1L)
+        );
+        assertTrue(exception.getMessage().contains("Room is occupied"));
+        verify(reservationRepository, never()).save(any(Reservation.class));
+        verify(roomRepository, never()).save(any(Room.class));
+    }
+
+    @Test
+    @DisplayName("Check-in debe actualizar la disponibilidad de la habitación")
+    void shouldUpdateRoomAvailability() {
+        // Given - Dada una reserva confirmada con check-in hoy
+        LocalDate today = LocalDate.now();
+        Room room = new Room("101", RoomType.STANDARD, 2, BigDecimal.valueOf(100));
+        room.setId(1L);
+        room.setIsAvailable(true);
+
+        Guest guest = new Guest("Juan", "Pérez", "12345678", "juan@email.com", "+123456789");
+        guest.setId(1L);
+
+        Reservation reservation = new Reservation(
+                "RES-2026-001",
+                guest,
+                room,
+                today,
+                today.plusDays(2),
+                2,
+                BigDecimal.valueOf(200)
+        );
+        reservation.setId(1L);
+        reservation.confirmPayment();
+
+        // When - Cuando realizo el check-in
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.findOverlappingReservations(
+                room,
+                today,
+                today.plusDays(2)
+        )).thenReturn(Collections.emptyList());
+        when(roomRepository.save(any(Room.class))).thenReturn(room);
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
+
+        reservationService.checkIn(1L);
+
+        // Then - Entonces la habitación debe cambiar a no disponible
+        assertFalse(room.getIsAvailable());
+        verify(roomRepository).save(room);
+    }
+
+    @Test
+    @DisplayName("Check-in debe fallar si la fecha de entrada no es hoy (validación estricta)")
+    void shouldThrowExceptionWhenCheckInDateNotToday() {
+        // Given - Dada una reserva confirmada con fecha de entrada mañana
+        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        Room room = new Room("101", RoomType.STANDARD, 2, BigDecimal.valueOf(100));
+        room.setId(1L);
+
+        Guest guest = new Guest("Juan", "Pérez", "12345678", "juan@email.com", "+123456789");
+        guest.setId(1L);
+
+        Reservation reservation = new Reservation(
+                "RES-2026-001",
+                guest,
+                room,
+                tomorrow,
+                tomorrow.plusDays(2),
+                2,
+                BigDecimal.valueOf(200)
+        );
+        reservation.setId(1L);
+        reservation.confirmPayment();
+
+        // When - Cuando intento realizar el check-in
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+
+        // Then - Entonces debe lanzar excepción de validación estricta
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> reservationService.checkIn(1L)
+        );
+        assertTrue(exception.getMessage().contains("Check-in can only be performed on the check-in date"));
+        verify(reservationRepository, never()).save(any(Reservation.class));
+        verify(roomRepository, never()).save(any(Room.class));
+    }
 }
