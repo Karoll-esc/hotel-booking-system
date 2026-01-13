@@ -2,6 +2,7 @@ package com.sofka.hotel_booking_api.infrastructure.exception;
 
 import com.sofka.hotel_booking_api.domain.exception.DuplicateRoomNumberException;
 import com.sofka.hotel_booking_api.domain.exception.InvalidDateRangeException;
+import com.sofka.hotel_booking_api.domain.exception.ReservationNotFoundException;
 import com.sofka.hotel_booking_api.domain.exception.RoomNotFoundException;
 import com.sofka.hotel_booking_api.infrastructure.constants.ValidationMessages;
 import org.springframework.http.HttpStatus;
@@ -79,6 +80,54 @@ public class GlobalExceptionHandler {
         ErrorResponse error = buildErrorResponse(
             HttpStatus.BAD_REQUEST,
             "Rango de fechas inválido",
+            ex.getMessage()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
+     * Maneja excepciones cuando no se encuentra una reserva por ID.
+     * 
+     * @param ex la excepción de reserva no encontrada
+     * @return respuesta HTTP 404 NOT FOUND con detalles del error
+     */
+    @ExceptionHandler(ReservationNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleReservationNotFound(ReservationNotFoundException ex) {
+        ErrorResponse error = buildErrorResponse(
+            HttpStatus.NOT_FOUND,
+            "Reserva no encontrada",
+            ex.getMessage()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    /**
+     * Maneja excepciones de estado inválido (ej: intentar confirmar pago de reserva ya confirmada).
+     * 
+     * @param ex la excepción de estado ilegal
+     * @return respuesta HTTP 400 BAD REQUEST con detalles del error
+     */
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException ex) {
+        ErrorResponse error = buildErrorResponse(
+            HttpStatus.BAD_REQUEST,
+            "Operación no permitida",
+            ex.getMessage()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
+     * Maneja excepciones de argumentos inválidos (ej: monto incorrecto, método de pago inválido).
+     * 
+     * @param ex la excepción de argumento ilegal
+     * @return respuesta HTTP 400 BAD REQUEST con detalles del error
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
+        ErrorResponse error = buildErrorResponse(
+            HttpStatus.BAD_REQUEST,
+            "Datos inválidos",
             ex.getMessage()
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
