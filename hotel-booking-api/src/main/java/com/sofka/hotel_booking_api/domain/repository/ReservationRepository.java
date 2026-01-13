@@ -77,6 +77,16 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     List<Reservation> findByCheckInDateAndStatusOrderByCheckInDateAsc(LocalDate checkInDate, ReservationStatus status);
 
     /**
+     * Busca reservas por fecha de check-in y múltiples estados.
+     * Historia 5.2: Ver reservas del día - Check-ins de hoy (pendientes y realizados)
+     *
+     * @param checkInDate fecha de check-in
+     * @param statuses lista de estados permitidos (ej: CONFIRMED, ACTIVE)
+     * @return lista de reservas ordenadas por fecha de check-in
+     */
+    List<Reservation> findByCheckInDateAndStatusInOrderByCheckInDateAsc(LocalDate checkInDate, List<ReservationStatus> statuses);
+
+    /**
      * Busca reservas por fecha de check-out y estado.
      * Historia 5.2: Ver reservas del día - Check-outs de hoy
      *

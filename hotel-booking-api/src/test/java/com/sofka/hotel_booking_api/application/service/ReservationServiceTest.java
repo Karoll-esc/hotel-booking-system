@@ -555,7 +555,9 @@ class ReservationServiceTest {
         reservation2.setId(2L);
         reservation2.setStatus(ReservationStatus.CONFIRMED);
 
-        when(reservationRepository.findByCheckInDateAndStatusOrderByCheckInDateAsc(today, ReservationStatus.CONFIRMED))
+        when(reservationRepository.findByCheckInDateAndStatusInOrderByCheckInDateAsc(
+                today, 
+                List.of(ReservationStatus.CONFIRMED, ReservationStatus.ACTIVE)))
                 .thenReturn(Arrays.asList(reservation1, reservation2));
         when(reservationRepository.findByCheckOutDateAndStatusOrderByCheckOutDateAsc(today, ReservationStatus.ACTIVE))
                 .thenReturn(Collections.emptyList());
@@ -575,7 +577,9 @@ class ReservationServiceTest {
         assertNotNull(response.checkOuts());
         assertTrue(response.checkOuts().isEmpty());
         
-        verify(reservationRepository).findByCheckInDateAndStatusOrderByCheckInDateAsc(today, ReservationStatus.CONFIRMED);
+        verify(reservationRepository).findByCheckInDateAndStatusInOrderByCheckInDateAsc(
+                today, 
+                List.of(ReservationStatus.CONFIRMED, ReservationStatus.ACTIVE));
         verify(reservationRepository).findByCheckOutDateAndStatusOrderByCheckOutDateAsc(today, ReservationStatus.ACTIVE);
     }
 
@@ -609,7 +613,9 @@ class ReservationServiceTest {
         activeReservation2.setId(4L);
         activeReservation2.setStatus(ReservationStatus.ACTIVE);
 
-        when(reservationRepository.findByCheckInDateAndStatusOrderByCheckInDateAsc(today, ReservationStatus.CONFIRMED))
+        when(reservationRepository.findByCheckInDateAndStatusInOrderByCheckInDateAsc(
+                today, 
+                List.of(ReservationStatus.CONFIRMED, ReservationStatus.ACTIVE)))
                 .thenReturn(Collections.emptyList());
         when(reservationRepository.findByCheckOutDateAndStatusOrderByCheckOutDateAsc(today, ReservationStatus.ACTIVE))
                 .thenReturn(Arrays.asList(activeReservation1, activeReservation2));
@@ -629,7 +635,9 @@ class ReservationServiceTest {
         assertNotNull(response.checkIns());
         assertTrue(response.checkIns().isEmpty());
         
-        verify(reservationRepository).findByCheckInDateAndStatusOrderByCheckInDateAsc(today, ReservationStatus.CONFIRMED);
+        verify(reservationRepository).findByCheckInDateAndStatusInOrderByCheckInDateAsc(
+                today, 
+                List.of(ReservationStatus.CONFIRMED, ReservationStatus.ACTIVE));
         verify(reservationRepository).findByCheckOutDateAndStatusOrderByCheckOutDateAsc(today, ReservationStatus.ACTIVE);
     }
 
@@ -665,7 +673,9 @@ class ReservationServiceTest {
         checkOutReservation.setId(6L);
         checkOutReservation.setStatus(ReservationStatus.ACTIVE);
 
-        when(reservationRepository.findByCheckInDateAndStatusOrderByCheckInDateAsc(today, ReservationStatus.CONFIRMED))
+        when(reservationRepository.findByCheckInDateAndStatusInOrderByCheckInDateAsc(
+                today, 
+                List.of(ReservationStatus.CONFIRMED, ReservationStatus.ACTIVE)))
                 .thenReturn(Collections.singletonList(checkInReservation));
         when(reservationRepository.findByCheckOutDateAndStatusOrderByCheckOutDateAsc(today, ReservationStatus.ACTIVE))
                 .thenReturn(Collections.singletonList(checkOutReservation));
@@ -687,7 +697,9 @@ class ReservationServiceTest {
         // Given - Dado que no hay reservas para hoy
         LocalDate today = LocalDate.now();
         
-        when(reservationRepository.findByCheckInDateAndStatusOrderByCheckInDateAsc(today, ReservationStatus.CONFIRMED))
+        when(reservationRepository.findByCheckInDateAndStatusInOrderByCheckInDateAsc(
+                today, 
+                List.of(ReservationStatus.CONFIRMED, ReservationStatus.ACTIVE)))
                 .thenReturn(Collections.emptyList());
         when(reservationRepository.findByCheckOutDateAndStatusOrderByCheckOutDateAsc(today, ReservationStatus.ACTIVE))
                 .thenReturn(Collections.emptyList());
@@ -709,8 +721,10 @@ class ReservationServiceTest {
         // Given - Dado que hay una reserva PENDING para hoy (no debe aparecer)
         LocalDate today = LocalDate.now();
         
-        // Solo busca CONFIRMED, no PENDING
-        when(reservationRepository.findByCheckInDateAndStatusOrderByCheckInDateAsc(today, ReservationStatus.CONFIRMED))
+        // Solo busca CONFIRMED y ACTIVE, no PENDING
+        when(reservationRepository.findByCheckInDateAndStatusInOrderByCheckInDateAsc(
+                today, 
+                List.of(ReservationStatus.CONFIRMED, ReservationStatus.ACTIVE)))
                 .thenReturn(Collections.emptyList());
         when(reservationRepository.findByCheckOutDateAndStatusOrderByCheckOutDateAsc(today, ReservationStatus.ACTIVE))
                 .thenReturn(Collections.emptyList());
@@ -720,7 +734,9 @@ class ReservationServiceTest {
 
         // Then - Entonces no hay check-ins (porque PENDING no cuenta)
         assertTrue(response.checkIns().isEmpty());
-        verify(reservationRepository).findByCheckInDateAndStatusOrderByCheckInDateAsc(today, ReservationStatus.CONFIRMED);
+        verify(reservationRepository).findByCheckInDateAndStatusInOrderByCheckInDateAsc(
+                today, 
+                List.of(ReservationStatus.CONFIRMED, ReservationStatus.ACTIVE));
         verify(reservationRepository, never()).findByCheckInDateAndStatusOrderByCheckInDateAsc(today, ReservationStatus.PENDING);
     }
 
@@ -731,7 +747,9 @@ class ReservationServiceTest {
         LocalDate today = LocalDate.now();
         
         // Solo busca ACTIVE para check-outs, no CONFIRMED
-        when(reservationRepository.findByCheckInDateAndStatusOrderByCheckInDateAsc(today, ReservationStatus.CONFIRMED))
+        when(reservationRepository.findByCheckInDateAndStatusInOrderByCheckInDateAsc(
+                today, 
+                List.of(ReservationStatus.CONFIRMED, ReservationStatus.ACTIVE)))
                 .thenReturn(Collections.emptyList());
         when(reservationRepository.findByCheckOutDateAndStatusOrderByCheckOutDateAsc(today, ReservationStatus.ACTIVE))
                 .thenReturn(Collections.emptyList());

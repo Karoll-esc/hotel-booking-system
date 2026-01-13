@@ -182,19 +182,20 @@ public class ReservationService {
     public TodayReservationsResponse getTodayReservations() {
         LocalDate today = LocalDate.now();
         
-        // Obtener check-ins del día (reservas CONFIRMED con entrada hoy)
-        List<Reservation> checkInReservations = reservationRepository
-                .findByCheckInDateAndStatusOrderByCheckInDateAsc(today, ReservationStatus.CONFIRMED);
-        
-        List<ReservationResponse> checkIns = checkInReservations.stream()
+        // Obtener check-ins del día: CONFIRMED (pendientes) y ACTIVE (ya realizados hoy)
+        List<ReservationResponse> checkIns = reservationRepository
+                .findByCheckInDateAndStatusInOrderByCheckInDateAsc(
+                    today, 
+                    List.of(ReservationStatus.CONFIRMED, ReservationStatus.ACTIVE)
+                )
+                .stream()
                 .map(ReservationResponse::fromEntity)
                 .collect(Collectors.toList());
         
         // Obtener check-outs del día (reservas ACTIVE con salida hoy)
-        List<Reservation> checkOutReservations = reservationRepository
-                .findByCheckOutDateAndStatusOrderByCheckOutDateAsc(today, ReservationStatus.ACTIVE);
-        
-        List<ReservationResponse> checkOuts = checkOutReservations.stream()
+        List<ReservationResponse> checkOuts = reservationRepository
+                .findByCheckOutDateAndStatusOrderByCheckOutDateAsc(today, ReservationStatus.ACTIVE)
+                .stream()
                 .map(ReservationResponse::fromEntity)
                 .collect(Collectors.toList());
         
