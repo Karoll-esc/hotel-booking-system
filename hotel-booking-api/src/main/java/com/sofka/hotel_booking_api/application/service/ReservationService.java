@@ -4,12 +4,14 @@ import com.sofka.hotel_booking_api.domain.exception.InvalidDateRangeException;
 import com.sofka.hotel_booking_api.domain.exception.RoomNotFoundException;
 import com.sofka.hotel_booking_api.domain.model.Guest;
 import com.sofka.hotel_booking_api.domain.model.Reservation;
+import com.sofka.hotel_booking_api.domain.model.ReservationStatus;
 import com.sofka.hotel_booking_api.domain.model.Room;
 import com.sofka.hotel_booking_api.domain.repository.GuestRepository;
 import com.sofka.hotel_booking_api.domain.repository.ReservationRepository;
 import com.sofka.hotel_booking_api.domain.repository.RoomRepository;
 import com.sofka.hotel_booking_api.infrastructure.dto.CreateReservationRequest;
 import com.sofka.hotel_booking_api.infrastructure.dto.ReservationResponse;
+import com.sofka.hotel_booking_api.infrastructure.dto.TodayReservationsResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -168,5 +170,34 @@ public class ReservationService {
         return reservations.stream()
                 .map(ReservationResponse::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Obtiene las reservas del día actual (check-ins y check-outs programados).
+     * Historia 5.2: Ver reservas del día
+     * 
+     * @return objeto con listas de check-ins y check-outs para hoy
+     */
+    @Transactional(readOnly = true)
+    public TodayReservationsResponse getTodayReservations() {
+        LocalDate today = LocalDate.now();
+        
+        // Obtener check-ins del día (reservas CONFIRMED con entrada hoy)
+        List<Reservation> checkInReservations = reservationRepository
+                .findByCheckInDateAndStatusOrderByCheckInDateAsc(today, ReservationStatus.CONFIRMED);
+        
+        List<ReservationResponse> checkIns = checkInReservations.stream()
+                .map(ReservationResponse::fromEntity)
+                .collect(Collectors.toList());
+        
+        // Obtener check-outs del día (reservas ACTIVE con salida hoy)
+        List<Reservation> checkOutReservations = reservationRepository
+                .findByCheckOutDateAndStatusOrderByCheckOutDateAsc(today, ReservationStatus.ACTIVE);
+        
+        List<ReservationResponse> checkOuts = checkOutReservations.stream()
+                .map(ReservationResponse::fromEntity)
+                .collect(Collectors.toList());
+        
+        return new TodayReservationsResponse(checkIns, checkOuts);
     }
 }
