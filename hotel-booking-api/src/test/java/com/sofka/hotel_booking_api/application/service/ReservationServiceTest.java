@@ -6,6 +6,7 @@ import com.sofka.hotel_booking_api.domain.model.*;
 import com.sofka.hotel_booking_api.domain.repository.GuestRepository;
 import com.sofka.hotel_booking_api.domain.repository.ReservationRepository;
 import com.sofka.hotel_booking_api.domain.repository.RoomRepository;
+import com.sofka.hotel_booking_api.infrastructure.dto.CancelReservationResponse;
 import com.sofka.hotel_booking_api.infrastructure.dto.CreateGuestRequest;
 import com.sofka.hotel_booking_api.infrastructure.dto.CreateReservationRequest;
 import com.sofka.hotel_booking_api.infrastructure.dto.ReservationResponse;
@@ -997,5 +998,565 @@ class ReservationServiceTest {
         assertTrue(exception.getMessage().contains("Check-in can only be performed on the check-in date"));
         verify(reservationRepository, never()).save(any(Reservation.class));
         verify(roomRepository, never()).save(any(Room.class));
+    }
+
+    // ========== Historia 4.3: Realizar check-out del huésped - Fase RED ==========
+
+    @Test
+    @DisplayName("Check-out exitoso - reserva activa con fecha de salida hoy")
+    void shouldCheckOutSuccessfully() {
+        // Given - Dada una reserva activa con check-out hoy
+        LocalDate today = LocalDate.now();
+        Room room = new Room("101", RoomType.STANDARD, 2, BigDecimal.valueOf(100));
+        room.setId(1L);
+        room.setIsAvailable(false); // Ocupada
+
+        Guest guest = new Guest("Juan", "Pérez", "12345678", "juan@email.com", "+123456789");
+        guest.setId(1L);
+
+        Reservation reservation = new Reservation(
+                "RES-2026-001",
+                guest,
+                room,
+                today.minusDays(3),
+                today,
+                2,
+                BigDecimal.valueOf(300)
+        );
+        reservation.setId(1L);
+        reservation.confirmPayment();
+        reservation.checkIn(); // Estado ACTIVE
+
+        // When - Cuando realizo el check-out
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
+        when(roomRepository.save(any(Room.class))).thenReturn(room);
+
+        reservationService.checkOut(1L);
+
+        // Then - Entonces la reserva cambia a COMPLETED, se registra checkOutTime y la habitación queda disponible
+        assertEquals(ReservationStatus.COMPLETED, reservation.getStatus());
+        assertNotNull(reservation.getCheckOutTime());
+        assertTrue(room.getIsAvailable());
+        verify(reservationRepository).save(reservation);
+        verify(roomRepository).save(room);
+    }
+
+    @Test
+    @DisplayName("Check-out debe fallar si el check-in no se ha realizado")
+    void shouldThrowExceptionWhenCheckOutWithoutCheckIn() {
+        // Given - Dada una reserva en estado CONFIRMED (sin check-in)
+        LocalDate today = LocalDate.now();
+        Room room = new Room("101", RoomType.STANDARD, 2, BigDecimal.valueOf(100));
+        room.setId(1L);
+
+        Guest guest = new Guest("Juan", "Pérez", "12345678", "juan@email.com", "+123456789");
+        guest.setId(1L);
+
+        Reservation reservation = new Reservation(
+                "RES-2026-001",
+                guest,
+                room,
+                today,
+                today.plusDays(2),
+                2,
+                BigDecimal.valueOf(200)
+        );
+        reservation.setId(1L);
+        reservation.confirmPayment(); // Estado CONFIRMED, NO se hace check-in
+
+        // When - Cuando intento realizar el check-out
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+
+        // Then - Entonces debe lanzar excepción
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> reservationService.checkOut(1L)
+        );
+        assertEquals("Solo se puede hacer check-out en reservas ACTIVAS", exception.getMessage());
+        verify(reservationRepository, never()).save(any(Reservation.class));
+        verify(roomRepository, never()).save(any(Room.class));
+    }
+
+    @Test
+    @DisplayName("Check-out debe fallar si la reserva no existe")
+    void shouldThrowExceptionWhenReservationNotFoundForCheckOut() {
+        // Given - Dado un ID de reserva inexistente
+        Long nonExistentId = 999L;
+
+        // When - Cuando intento realizar el check-out
+        when(reservationRepository.findById(nonExistentId)).thenReturn(Optional.empty());
+
+        // Then - Entonces debe lanzar excepción
+        assertThrows(
+                com.sofka.hotel_booking_api.domain.exception.ReservationNotFoundException.class,
+                () -> reservationService.checkOut(nonExistentId)
+        );
+        verify(reservationRepository, never()).save(any(Reservation.class));
+        verify(roomRepository, never()).save(any(Room.class));
+    }
+
+    @Test
+    @DisplayName("Check-out debe actualizar la disponibilidad de la habitación a true")
+    void shouldUpdateRoomAvailabilityAfterCheckOut() {
+        // Given - Dada una reserva activa con habitación ocupada
+        LocalDate today = LocalDate.now();
+        Room room = new Room("101", RoomType.STANDARD, 2, BigDecimal.valueOf(100));
+        room.setId(1L);
+        room.setIsAvailable(false); // Ocupada
+
+        Guest guest = new Guest("Juan", "Pérez", "12345678", "juan@email.com", "+123456789");
+        guest.setId(1L);
+
+        Reservation reservation = new Reservation(
+                "RES-2026-001",
+                guest,
+                room,
+                today.minusDays(3),
+                today,
+                2,
+                BigDecimal.valueOf(300)
+        );
+        reservation.setId(1L);
+        reservation.confirmPayment();
+        reservation.checkIn();
+
+        // When - Cuando realizo el check-out
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
+        when(roomRepository.save(any(Room.class))).thenReturn(room);
+
+        reservationService.checkOut(1L);
+
+        // Then - Entonces la habitación debe cambiar a disponible
+        assertTrue(room.getIsAvailable());
+        verify(roomRepository).save(room);
+    }
+
+    @Test
+    @DisplayName("Check-out anticipado debe permitirse (flexible checkout)")
+    void shouldAllowEarlyCheckOut() {
+        // Given - Dada una reserva activa con fecha de salida mañana
+        LocalDate today = LocalDate.now();
+        LocalDate tomorrow = today.plusDays(1);
+        Room room = new Room("101", RoomType.STANDARD, 2, BigDecimal.valueOf(100));
+        room.setId(1L);
+        room.setIsAvailable(false);
+
+        Guest guest = new Guest("Juan", "Pérez", "12345678", "juan@email.com", "+123456789");
+        guest.setId(1L);
+
+        Reservation reservation = new Reservation(
+                "RES-2026-001",
+                guest,
+                room,
+                today.minusDays(2),
+                tomorrow, // Checkout programado para mañana
+                2,
+                BigDecimal.valueOf(300)
+        );
+        reservation.setId(1L);
+        reservation.confirmPayment();
+        reservation.checkIn();
+
+        // When - Cuando realizo el check-out anticipado hoy
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
+        when(roomRepository.save(any(Room.class))).thenReturn(room);
+
+        reservationService.checkOut(1L);
+
+        // Then - Entonces el check-out se completa exitosamente
+        assertEquals(ReservationStatus.COMPLETED, reservation.getStatus());
+        assertNotNull(reservation.getCheckOutTime());
+        assertTrue(room.getIsAvailable());
+        verify(reservationRepository).save(reservation);
+        verify(roomRepository).save(room);
+    }
+
+    @Test
+    @DisplayName("Check-out tardío debe permitirse (flexible checkout)")
+    void shouldAllowLateCheckOut() {
+        // Given - Dada una reserva activa con fecha de salida ayer
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
+        Room room = new Room("101", RoomType.STANDARD, 2, BigDecimal.valueOf(100));
+        room.setId(1L);
+        room.setIsAvailable(false);
+
+        Guest guest = new Guest("Juan", "Pérez", "12345678", "juan@email.com", "+123456789");
+        guest.setId(1L);
+
+        Reservation reservation = new Reservation(
+                "RES-2026-001",
+                guest,
+                room,
+                today.minusDays(5),
+                yesterday, // Checkout programado para ayer (tarde)
+                2,
+                BigDecimal.valueOf(500)
+        );
+        reservation.setId(1L);
+        reservation.confirmPayment();
+        reservation.checkIn();
+
+        // When - Cuando realizo el check-out tardío hoy
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
+        when(roomRepository.save(any(Room.class))).thenReturn(room);
+
+        reservationService.checkOut(1L);
+
+        // Then - Entonces el check-out se completa exitosamente
+        assertEquals(ReservationStatus.COMPLETED, reservation.getStatus());
+        assertNotNull(reservation.getCheckOutTime());
+        assertTrue(room.getIsAvailable());
+        verify(reservationRepository).save(reservation);
+        verify(roomRepository).save(room);
+    }
+
+    /**
+     * Historia 7.1: Cancelar reserva existente
+     * Tests para la funcionalidad de cancelación con cálculo de reembolso según RN-001
+     */
+
+    @Test
+    @DisplayName("Should cancel reservation 10+ days before and calculate 100% refund")
+    void shouldCancelReservationWithFullRefund() {
+        // Given - Reserva confirmada para dentro de 10 días
+        LocalDate checkInDate = LocalDate.now().plusDays(10);
+        LocalDate checkOutDate = checkInDate.plusDays(5);
+        
+        Guest guest = new Guest("Juan", "Pérez", "12345678", "juan@email.com", "+57 300 1234567");
+        Room room = new Room("301", RoomType.STANDARD, 2, BigDecimal.valueOf(100.00));
+        Reservation reservation = new Reservation(
+                "RES-2026-001234",
+                guest,
+                room,
+                checkInDate,
+                checkOutDate,
+                2,
+                BigDecimal.valueOf(500.00)
+        );
+        reservation.confirmPayment();
+
+        // When - Cancelo la reserva
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
+        when(roomRepository.save(any(Room.class))).thenReturn(room);
+
+        CancelReservationResponse response = reservationService.cancelReservation(1L, "Cambio de planes del huésped");
+
+        // Then - La reserva se cancela con 100% de reembolso
+        assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
+        assertNotNull(reservation.getCancelledAt());
+        assertEquals("Cambio de planes del huésped", reservation.getCancellationReason());
+        assertTrue(room.getIsAvailable());
+        
+        // Verificar cálculo de reembolso
+        assertEquals(0, response.totalAmount().compareTo(BigDecimal.valueOf(500.00)));
+        assertEquals(0, response.refundAmount().compareTo(BigDecimal.valueOf(500.00)));
+        assertEquals(0, response.penaltyAmount().compareTo(BigDecimal.ZERO));
+        assertEquals(100, response.refundPercentage());
+        
+        verify(reservationRepository).save(reservation);
+        verify(roomRepository).save(room);
+    }
+
+    @Test
+    @DisplayName("Should cancel reservation 5 days before and calculate 50% refund")
+    void shouldCancelReservationWithPartialRefund() {
+        // Given - Reserva confirmada para dentro de 5 días
+        LocalDate checkInDate = LocalDate.now().plusDays(5);
+        LocalDate checkOutDate = checkInDate.plusDays(3);
+        
+        Guest guest = new Guest("María", "García", "87654321", "maria@email.com", "+57 300 9876543");
+        Room room = new Room("302", RoomType.SUITE, 4, BigDecimal.valueOf(200.00));
+        Reservation reservation = new Reservation(
+                "RES-2026-002345",
+                guest,
+                room,
+                checkInDate,
+                checkOutDate,
+                2,
+                BigDecimal.valueOf(600.00)
+        );
+        reservation.confirmPayment();
+
+        // When - Cancelo la reserva
+        when(reservationRepository.findById(2L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
+        when(roomRepository.save(any(Room.class))).thenReturn(room);
+
+        CancelReservationResponse response = reservationService.cancelReservation(2L, "Emergencia familiar");
+
+        // Then - La reserva se cancela con 50% de reembolso
+        assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
+        
+        // Verificar cálculo de reembolso con penalidad del 50%
+        assertEquals(0, response.totalAmount().compareTo(BigDecimal.valueOf(600.00)));
+        assertEquals(0, response.refundAmount().compareTo(BigDecimal.valueOf(300.00)));
+        assertEquals(0, response.penaltyAmount().compareTo(BigDecimal.valueOf(300.00)));
+        assertEquals(50, response.refundPercentage());
+        
+        verify(reservationRepository).save(reservation);
+        verify(roomRepository).save(room);
+    }
+
+    @Test
+    @DisplayName("Should cancel reservation 1 day before with 0% refund")
+    void shouldCancelReservationWithNoRefund() {
+        // Given - Reserva confirmada para dentro de 1 día
+        LocalDate checkInDate = LocalDate.now().plusDays(1);
+        LocalDate checkOutDate = checkInDate.plusDays(2);
+        
+        Guest guest = new Guest("Carlos", "Ruiz", "11223344", "carlos@email.com", "+57 300 1122334");
+        Room room = new Room("303", RoomType.STANDARD, 2, BigDecimal.valueOf(150.00));
+        Reservation reservation = new Reservation(
+                "RES-2026-003456",
+                guest,
+                room,
+                checkInDate,
+                checkOutDate,
+                2,
+                BigDecimal.valueOf(300.00)
+        );
+        reservation.confirmPayment();
+
+        // When - Cancelo la reserva
+        when(reservationRepository.findById(3L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
+        when(roomRepository.save(any(Room.class))).thenReturn(room);
+
+        CancelReservationResponse response = reservationService.cancelReservation(3L, "Cancelación de último momento");
+
+        // Then - La reserva se cancela sin reembolso
+        assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
+        
+        // Verificar penalidad del 100%
+        assertEquals(0, response.totalAmount().compareTo(BigDecimal.valueOf(300.00)));
+        assertEquals(0, response.refundAmount().compareTo(BigDecimal.ZERO));
+        assertEquals(0, response.penaltyAmount().compareTo(BigDecimal.valueOf(300.00)));
+        assertEquals(0, response.refundPercentage());
+        
+        verify(reservationRepository).save(reservation);
+        verify(roomRepository).save(room);
+    }
+
+    @Test
+    @DisplayName("Should cancel ACTIVE reservation with 0% refund")
+    void shouldCancelActiveReservationWithNoRefund() {
+        // Given - Reserva ACTIVE (check-in realizado)
+        LocalDate checkInDate = LocalDate.now();
+        LocalDate checkOutDate = checkInDate.plusDays(3);
+        
+        Guest guest = new Guest("Ana", "López", "55667788", "ana@email.com", "+57 300 5566778");
+        Room room = new Room("304", RoomType.SUITE, 3, BigDecimal.valueOf(250.00));
+        room.setIsAvailable(false);
+        
+        Reservation reservation = new Reservation(
+                "RES-2026-004567",
+                guest,
+                room,
+                checkInDate,
+                checkOutDate,
+                2,
+                BigDecimal.valueOf(750.00)
+        );
+        reservation.confirmPayment();
+        reservation.checkIn();
+
+        // When - Cancelo la reserva activa
+        when(reservationRepository.findById(4L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
+        when(roomRepository.save(any(Room.class))).thenReturn(room);
+
+        CancelReservationResponse response = reservationService.cancelReservation(4L, "Salida anticipada por emergencia");
+
+        // Then - La reserva se cancela sin reembolso (penalidad 100%)
+        assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
+        assertTrue(room.getIsAvailable());
+        
+        // Verificar penalidad del 100% para reserva activa
+        assertEquals(0, response.totalAmount().compareTo(BigDecimal.valueOf(750.00)));
+        assertEquals(0, response.refundAmount().compareTo(BigDecimal.ZERO));
+        assertEquals(0, response.penaltyAmount().compareTo(BigDecimal.valueOf(750.00)));
+        assertEquals(0, response.refundPercentage());
+        
+        verify(reservationRepository).save(reservation);
+        verify(roomRepository).save(room);
+    }
+
+    @Test
+    @DisplayName("Should cancel PENDING reservation applying penalty calculation")
+    void shouldCancelPendingReservation() {
+        // Given - Reserva PENDING (sin pago) para dentro de 10 días
+        LocalDate checkInDate = LocalDate.now().plusDays(10);
+        LocalDate checkOutDate = checkInDate.plusDays(2);
+        
+        Guest guest = new Guest("Pedro", "Martínez", "99887766", "pedro@email.com", "+57 300 9988776");
+        Room room = new Room("305", RoomType.STANDARD, 2, BigDecimal.valueOf(120.00));
+        Reservation reservation = new Reservation(
+                "RES-2026-005678",
+                guest,
+                room,
+                checkInDate,
+                checkOutDate,
+                1,
+                BigDecimal.valueOf(240.00)
+        );
+
+        // When - Cancelo la reserva pendiente
+        when(reservationRepository.findById(5L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
+        when(roomRepository.save(any(Room.class))).thenReturn(room);
+
+        CancelReservationResponse response = reservationService.cancelReservation(5L, "Cliente desiste de la reserva");
+
+        // Then - La reserva se cancela (100% reembolso por ser >7 días)
+        assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
+        assertTrue(room.getIsAvailable());
+        assertEquals(100, response.refundPercentage());
+        
+        verify(reservationRepository).save(reservation);
+        verify(roomRepository).save(room);
+    }
+
+    @Test
+    @DisplayName("Should throw exception when cancelling already COMPLETED reservation")
+    void shouldThrowExceptionWhenCancellingCompletedReservation() {
+        // Given - Reserva ya COMPLETED
+        LocalDate checkInDate = LocalDate.now().minusDays(3);
+        LocalDate checkOutDate = LocalDate.now();
+        
+        Guest guest = new Guest("Luis", "Fernández", "44332211", "luis@email.com", "+57 300 4433221");
+        Room room = new Room("306", RoomType.STANDARD, 2, BigDecimal.valueOf(100.00));
+        Reservation reservation = new Reservation(
+                "RES-2026-006789",
+                guest,
+                room,
+                checkInDate,
+                checkOutDate,
+                2,
+                BigDecimal.valueOf(300.00)
+        );
+        reservation.confirmPayment();
+        reservation.checkIn();
+        reservation.checkOut();
+
+        // When/Then - Intento cancelar reserva completada
+        when(reservationRepository.findById(6L)).thenReturn(Optional.of(reservation));
+
+        assertThrows(IllegalStateException.class, () -> {
+            reservationService.cancelReservation(6L, "Intento inválido");
+        });
+    }
+
+    @Test
+    @DisplayName("Should throw exception when cancelling already CANCELLED reservation")
+    void shouldThrowExceptionWhenCancellingAlreadyCancelledReservation() {
+        // Given - Reserva ya CANCELLED
+        LocalDate checkInDate = LocalDate.now().plusDays(5);
+        LocalDate checkOutDate = checkInDate.plusDays(2);
+        
+        Guest guest = new Guest("Sofía", "Ramírez", "66554433", "sofia@email.com", "+57 300 6655443");
+        Room room = new Room("307", RoomType.SUITE, 4, BigDecimal.valueOf(200.00));
+        Reservation reservation = new Reservation(
+                "RES-2026-007890",
+                guest,
+                room,
+                checkInDate,
+                checkOutDate,
+                3,
+                BigDecimal.valueOf(400.00)
+        );
+        reservation.confirmPayment();
+        reservation.cancel("Primera cancelación");
+
+        // When/Then - Intento cancelar nuevamente
+        when(reservationRepository.findById(7L)).thenReturn(Optional.of(reservation));
+
+        assertThrows(IllegalStateException.class, () -> {
+            reservationService.cancelReservation(7L, "Segundo intento");
+        });
+    }
+
+    @Test
+    @DisplayName("Should throw exception when reservation not found for cancellation")
+    void shouldThrowExceptionWhenReservationNotFoundForCancellation() {
+        // Given - Reserva no existe
+        Long nonExistentId = 999L;
+
+        // When/Then - Intento cancelar reserva inexistente
+        when(reservationRepository.findById(nonExistentId)).thenReturn(Optional.empty());
+
+        assertThrows(com.sofka.hotel_booking_api.domain.exception.ReservationNotFoundException.class, () -> {
+            reservationService.cancelReservation(nonExistentId, "No debería llegar aquí");
+        });
+    }
+
+    @Test
+    @DisplayName("Should update room availability after cancellation")
+    void shouldUpdateRoomAvailabilityAfterCancellation() {
+        // Given - Reserva confirmada con habitación asignada
+        LocalDate checkInDate = LocalDate.now().plusDays(15);
+        LocalDate checkOutDate = checkInDate.plusDays(4);
+        
+        Guest guest = new Guest("Diego", "Torres", "22113344", "diego@email.com", "+57 300 2211334");
+        Room room = new Room("308", RoomType.STANDARD, 2, BigDecimal.valueOf(130.00));
+        Reservation reservation = new Reservation(
+                "RES-2026-008901",
+                guest,
+                room,
+                checkInDate,
+                checkOutDate,
+                2,
+                BigDecimal.valueOf(520.00)
+        );
+        reservation.confirmPayment();
+
+        // When - Cancelo la reserva
+        when(reservationRepository.findById(8L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
+        when(roomRepository.save(any(Room.class))).thenReturn(room);
+
+        reservationService.cancelReservation(8L, "Cambio de destino");
+
+        // Then - La habitación vuelve a estar disponible
+        assertTrue(room.getIsAvailable());
+        verify(roomRepository).save(room);
+    }
+
+    @Test
+    @DisplayName("Should calculate exact refund at 7 days boundary (100% refund)")
+    void shouldCalculateFullRefundAtSevenDaysBoundary() {
+        // Given - Reserva para exactamente 7 días adelante
+        LocalDate checkInDate = LocalDate.now().plusDays(7);
+        LocalDate checkOutDate = checkInDate.plusDays(3);
+        
+        Guest guest = new Guest("Laura", "Morales", "77889900", "laura@email.com", "+57 300 7788990");
+        Room room = new Room("309", RoomType.SUITE, 3, BigDecimal.valueOf(180.00));
+        Reservation reservation = new Reservation(
+                "RES-2026-009012",
+                guest,
+                room,
+                checkInDate,
+                checkOutDate,
+                2,
+                BigDecimal.valueOf(540.00)
+        );
+        reservation.confirmPayment();
+
+        // When - Cancelo la reserva
+        when(reservationRepository.findById(9L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
+        when(roomRepository.save(any(Room.class))).thenReturn(room);
+
+        CancelReservationResponse response = reservationService.cancelReservation(9L, "Prueba de frontera");
+
+        // Then - 7 días = 100% reembolso (frontera superior)
+        assertEquals(100, response.refundPercentage());
+        assertEquals(0, response.refundAmount().compareTo(BigDecimal.valueOf(540.00)));
+        assertEquals(0, response.penaltyAmount().compareTo(BigDecimal.ZERO));
     }
 }

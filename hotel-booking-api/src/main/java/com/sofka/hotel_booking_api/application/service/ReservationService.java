@@ -254,4 +254,80 @@ public class ReservationService {
         reservationRepository.save(reservation);
         roomRepository.save(room);
     }
+
+    /**
+     * Realiza el check-out de una reserva.
+     * Validación flexible: permite check-out en cualquier momento después del check-in.
+     * Historia 4.3: Realizar check-out del huésped
+     *
+     * @param reservationId ID de la reserva
+     * @throws com.sofka.hotel_booking_api.domain.exception.ReservationNotFoundException si la reserva no existe
+     * @throws IllegalStateException si la reserva no está en estado ACTIVE
+     */
+    @Transactional
+    public void checkOut(Long reservationId) {
+        // 1. Buscar la reserva
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new com.sofka.hotel_booking_api.domain.exception.ReservationNotFoundException(
+                        "Reservation not found with id: " + reservationId));
+
+        // 2. Realizar check-out (valida que esté en estado ACTIVE)
+        reservation.checkOut();
+
+        // 3. Marcar habitación como disponible
+        Room room = reservation.getRoom();
+        room.setIsAvailable(true);
+
+        // 4. Guardar cambios
+        reservationRepository.save(reservation);
+        roomRepository.save(room);
+    }
+
+    /**
+     * Cancela una reserva y calcula el reembolso según la política de cancelación.
+     * Validación flexible: permite cancelar PENDING, CONFIRMED y ACTIVE.
+     * Historia 7.1: Cancelar reserva existente
+     *
+     * @param reservationId ID de la reserva
+     * @param reason motivo de cancelación
+     * @return respuesta con detalles de la cancelación y cálculo de reembolso
+     * @throws com.sofka.hotel_booking_api.domain.exception.ReservationNotFoundException si la reserva no existe
+     * @throws IllegalStateException si la reserva no puede ser cancelada
+     */
+    @Transactional
+    public com.sofka.hotel_booking_api.infrastructure.dto.CancelReservationResponse cancelReservation(
+            Long reservationId, String reason) {
+        // 1. Buscar la reserva
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new com.sofka.hotel_booking_api.domain.exception.ReservationNotFoundException(
+                        "Reservation not found with id: " + reservationId));
+
+        // 2. Calcular porcentaje de reembolso antes de cancelar
+        int refundPercentage = reservation.calculateRefundPercentage();
+        BigDecimal totalAmount = reservation.getTotalAmount();
+        BigDecimal refundAmount = totalAmount.multiply(BigDecimal.valueOf(refundPercentage))
+                .divide(BigDecimal.valueOf(100));
+        BigDecimal penaltyAmount = totalAmount.subtract(refundAmount);
+
+        // 3. Cancelar la reserva (valida que pueda ser cancelada)
+        reservation.cancel(reason);
+
+        // 4. Marcar habitación como disponible
+        Room room = reservation.getRoom();
+        room.setIsAvailable(true);
+
+        // 5. Guardar cambios
+        reservationRepository.save(reservation);
+        roomRepository.save(room);
+
+        // 6. Retornar respuesta con detalles de la cancelación
+        return new com.sofka.hotel_booking_api.infrastructure.dto.CancelReservationResponse(
+                reservation.getReservationNumber(),
+                reservation.getCancelledAt(),
+                totalAmount,
+                refundAmount,
+                penaltyAmount,
+                refundPercentage
+        );
+    }
 }

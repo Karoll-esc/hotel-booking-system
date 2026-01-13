@@ -136,8 +136,8 @@ class ReservationTest {
     }
 
     @Test
-    @DisplayName("Debe retornar false cuando la reserva está en estado ACTIVE")
-    void shouldNotBeCancellableWhenActive() {
+    @DisplayName("Debe retornar true cuando la reserva está en estado ACTIVE (RN-001)")
+    void shouldBeCancellableWhenActive() {
         // Given
         reservation.setStatus(ReservationStatus.ACTIVE);
 
@@ -145,7 +145,7 @@ class ReservationTest {
         boolean isCancellable = reservation.isCancellable();
 
         // Then
-        assertThat(isCancellable).isFalse();
+        assertThat(isCancellable).isTrue();
     }
 
     @Test
@@ -318,15 +318,19 @@ class ReservationTest {
     }
 
     @Test
-    @DisplayName("Debe lanzar excepción al cancelar reserva en estado ACTIVE")
-    void shouldThrowExceptionWhenCancellingActive() {
+    @DisplayName("Debe permitir cancelar reserva en estado ACTIVE (RN-001)")
+    void shouldAllowCancellingActive() {
         // Given
         reservation.setStatus(ReservationStatus.ACTIVE);
+        String reason = "Salida anticipada por emergencia";
 
-        // When/Then
-        assertThatThrownBy(() -> reservation.cancel("Razón"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Esta reserva no puede ser cancelada");
+        // When
+        reservation.cancel(reason);
+
+        // Then
+        assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.CANCELLED);
+        assertThat(reservation.getCancelledAt()).isNotNull();
+        assertThat(reservation.getCancellationReason()).isEqualTo(reason);
     }
 
     @Test

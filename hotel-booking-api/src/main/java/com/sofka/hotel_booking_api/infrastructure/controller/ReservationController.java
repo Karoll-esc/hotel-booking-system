@@ -108,4 +108,36 @@ public class ReservationController {
         reservationService.checkIn(id);
         return ResponseEntity.ok().build();
     }
+
+    /**
+     * Endpoint para realizar el check-out de una reserva.
+     * POST /api/reservations/{id}/check-out
+     * Historia 4.3: Realizar check-out del huésped
+     *
+     * @param id ID de la reserva
+     * @return 200 OK cuando el check-out se realiza exitosamente
+     */
+    @PostMapping("/{id}/check-out")
+    public ResponseEntity<Void> checkOut(@PathVariable Long id) {
+        reservationService.checkOut(id);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Endpoint para cancelar una reserva con cálculo automático de reembolso.
+     * POST /api/reservations/{id}/cancel
+     * Historia 7.1: Cancelar reserva existente
+     *
+     * @param id ID de la reserva
+     * @param request motivo de cancelación
+     * @return respuesta con detalles de cancelación y montos de reembolso/penalidad
+     */
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<com.sofka.hotel_booking_api.infrastructure.dto.CancelReservationResponse> cancelReservation(
+            @PathVariable Long id,
+            @Valid @RequestBody com.sofka.hotel_booking_api.infrastructure.dto.CancelReservationRequest request) {
+        com.sofka.hotel_booking_api.infrastructure.dto.CancelReservationResponse response = 
+            reservationService.cancelReservation(id, request.reason());
+        return ResponseEntity.ok(response);
+    }
 }
