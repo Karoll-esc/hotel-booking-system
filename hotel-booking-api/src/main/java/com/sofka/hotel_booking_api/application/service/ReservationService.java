@@ -254,4 +254,32 @@ public class ReservationService {
         reservationRepository.save(reservation);
         roomRepository.save(room);
     }
+
+    /**
+     * Realiza el check-out de una reserva.
+     * Validación flexible: permite check-out en cualquier momento después del check-in.
+     * Historia 4.3: Realizar check-out del huésped
+     *
+     * @param reservationId ID de la reserva
+     * @throws com.sofka.hotel_booking_api.domain.exception.ReservationNotFoundException si la reserva no existe
+     * @throws IllegalStateException si la reserva no está en estado ACTIVE
+     */
+    @Transactional
+    public void checkOut(Long reservationId) {
+        // 1. Buscar la reserva
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new com.sofka.hotel_booking_api.domain.exception.ReservationNotFoundException(
+                        "Reservation not found with id: " + reservationId));
+
+        // 2. Realizar check-out (valida que esté en estado ACTIVE)
+        reservation.checkOut();
+
+        // 3. Marcar habitación como disponible
+        Room room = reservation.getRoom();
+        room.setIsAvailable(true);
+
+        // 4. Guardar cambios
+        reservationRepository.save(reservation);
+        roomRepository.save(room);
+    }
 }

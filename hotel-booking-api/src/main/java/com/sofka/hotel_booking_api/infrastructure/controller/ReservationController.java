@@ -108,4 +108,18 @@ public class ReservationController {
         reservationService.checkIn(id);
         return ResponseEntity.ok().build();
     }
+
+    /**
+     * Endpoint para realizar el check-out de una reserva.
+     * POST /api/reservations/{id}/check-out
+     * Historia 4.3: Realizar check-out del huésped
+     *
+     * @param id ID de la reserva
+     * @return 200 OK cuando el check-out se realiza exitosamente
+     */
+    @PostMapping("/{id}/check-out")
+    public ResponseEntity<Void> checkOut(@PathVariable Long id) {
+        reservationService.checkOut(id);
+        return ResponseEntity.ok().build();
+    }
 }
