@@ -357,6 +357,100 @@ Escenario: Intento de confirmar pago con monto incorrecto
 
 ---
 
+### Historia 4.2: Realizar check-in del huésped
+**Como** recepcionista  
+**Quiero** registrar la llegada del huésped al hotel  
+**Para** activar su reserva y asignar la habitación
+
+**Reglas de negocio:** [RN-002](REGLAS_NEGOCIO.md#rn-002-horarios-de-check-incheck-out), [RN-009](REGLAS_NEGOCIO.md#rn-009-estados-de-reserva)
+
+**Nota técnica:** El check-in solo puede realizarse si la reserva está en estado "Confirmada" (pago completado).
+
+#### Escenarios BDD:
+
+```gherkin
+Escenario: Check-in exitoso de reserva confirmada
+  Dado que existe una reserva en estado "Confirmada" con fecha de entrada hoy
+  Y el huésped presenta su documento de identidad "12345678"
+  Cuando realizo el check-in de la reserva
+  Entonces la reserva cambia a estado "Activa"
+  Y se registra la fecha y hora de check-in
+  Y la habitación asignada cambia a estado "Ocupada"
+  Y puedo entregar las llaves al huésped
+
+Escenario: Intento de check-in sin pago confirmado
+  Dado que existe una reserva en estado "Pendiente"
+  Cuando intento realizar el check-in
+  Entonces recibo un mensaje indicando que el pago debe confirmarse primero
+  Y el check-in no se completa
+  Y se me ofrece confirmar el pago en ese momento
+
+Escenario: Intento de check-in de reserva expirada
+  Dado que existe una reserva en estado "Expirada"
+  Cuando intento realizar el check-in
+  Entonces recibo un mensaje indicando que la reserva ha expirado
+  Y se sugiere crear una nueva reserva
+
+Escenario: Intento de check-in con habitación ya ocupada
+  Dado que existe una reserva en estado "Confirmada"
+  Y la habitación asignada está "Ocupada" por otra reserva activa
+  Cuando intento realizar el check-in
+  Entonces recibo un mensaje de conflicto de habitación
+  Y se me sugiere reasignar a otra habitación disponible del mismo tipo
+```
+
+---
+
+### Historia 4.3: Realizar check-out del huésped
+**Como** recepcionista  
+**Quiero** registrar la salida del huésped del hotel  
+**Para** liberar la habitación y completar la reserva
+
+**Reglas de negocio:** [RN-002](REGLAS_NEGOCIO.md#rn-002-horarios-de-check-incheck-out), [RN-009](REGLAS_NEGOCIO.md#rn-009-estados-de-reserva)
+
+#### Escenarios BDD:
+
+```gherkin
+Escenario: Check-out exitoso en fecha programada
+  Dado que existe una reserva en estado "Activa"
+  Y la fecha de salida programada es hoy
+  Cuando realizo el check-out de la reserva
+  Entonces la reserva cambia a estado "Completada"
+  Y se registra la fecha y hora de check-out
+  Y la habitación cambia a estado "Disponible"
+  Y puedo recibir las llaves del huésped
+
+Escenario: Check-out tardío (después de la hora límite)
+  Dado que existe una reserva en estado "Activa"
+  Y la hora actual es 13:00 (después de las 11:00)
+  Cuando realizo el check-out
+  Entonces se registra el check-out tardío
+  Y se puede aplicar un cargo adicional si es política del hotel
+  Y la habitación queda disponible
+
+Escenario: Check-out anticipado
+  Dado que existe una reserva en estado "Activa"
+  Y la fecha de salida programada es mañana
+  Cuando realizo el check-out hoy
+  Entonces se registra el check-out anticipado
+  Y la reserva cambia a estado "Completada"
+  Y la habitación queda disponible inmediatamente
+
+Escenario: Intento de check-out sin check-in previo
+  Dado que existe una reserva en estado "Confirmada"
+  Cuando intento realizar el check-out
+  Entonces recibo un mensaje indicando que el check-in no se ha realizado
+  Y el check-out no se completa
+
+Escenario: Consulta de cargos adicionales antes del check-out
+  Dado que existe una reserva en estado "Activa"
+  Cuando consulto los detalles de la reserva
+  Entonces puedo ver si hay cargos adicionales pendientes
+  Y puedo procesarlos antes de completar el check-out
+```
+
+---
+
 ## Épica 5: Consulta y Búsqueda de Reservas
 
 ### Historia 5.1: Buscar reservas existentes
